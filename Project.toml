@@ -3,6 +3,10 @@ uuid = "894afd4e-5c6f-4d1a-a294-873acbd0e95c"
 authors = ["Steffen Plunder <steffen.plunder@web.de> and contributors"]
 version = "1.0.0-DEV"
 
+[deps]
+BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
+
 [compat]
 julia = "1.6"
 
