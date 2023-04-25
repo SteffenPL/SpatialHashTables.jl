@@ -67,7 +67,6 @@ module SpatialHashTables
         box = boxindex(ht, pos)
         return ( k for bj in neighbouring_boxes(ht, box, r) for k in iterate_box(ht, bj) )
     end
-    
 
     export SpatialHashTable, updateboxes!, resize!, neighbours, boxindex, neighbouring_boxes, iterate_box
 

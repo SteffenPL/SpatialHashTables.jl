@@ -12,6 +12,9 @@
 Creates neigbour lists (currently only for bounded domains) and allows iteration over all 
 potential neigbours. 
 
+In the future, I would like to support spatial hash tables, which allow fast neighbour detection 
+without the need to specify a particular domain. 
+
 A typical application looks like 
 ```julia
 using SpatialHashTables 
@@ -21,22 +24,43 @@ X = rand(SVector{2, Float64}, 100)
 domain = (min = SVector{2, Float64}(0, 0), max = SVector{2, Float64}(1, 1))
 grid = (5, 5)
 
-ht = SpatialHashTable(domain, grid, length(X))
-updateboxes!(ht, X)
+ht = SpatialHashTable(domain, grid, X)
 
+# the structure can also be resized and updated 
 X = rand(SVector{2, Float64}, 1000)
-
 resize!(ht, length(X))
 updateboxes!(ht, X)
 
-R = 0.1
-closeby_pairs = ( (i,j) for i in eachindex(X) for j in neighbours(ht, X[i], R) if i < j )
-
+# computing interaction terms
+R = 0.1  # interaction radius
 F = @SVector [0.0, 0.0]
-for (i,j) in closeby_pairs 
-    F += ( X[i] - X[j] )  # replace this with the computation your are interested in
+for i in eachindex(X) 
+    for j in neighbours(ht, X[i], R)
+        if i < j
+            F += ( X[i] - X[j] )  # replace this with the computation your are interested in
+        end
+    end
 end
 ```
+
+The operations for updating lists and finding neighbours are allocation free.
+```julia 
+using BenchmarkTools
+
+interations(ht, X, R) = ( (i,j) for i in eachindex(X) for j in neighbours(ht, X[i], R) )
+function test_allocations(ht, X, R)
+    F = @SVector [0.0, 0.0]
+    for (i,j) in interations(ht, X, R)
+        if i < j
+            F += X[i] - X[j]
+        end
+    end
+    return F
+end
+
+@btime test_allocations($ht, $X, 0.1)   # 383.077 μs (0 allocations: 0 bytes)
+```
+
 
 # Similar packages
 
