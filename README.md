@@ -61,7 +61,15 @@ end
 @btime test_allocations($ht, $X, 0.1)   # 383.077 μs (0 allocations: 0 bytes)
 ```
 
-
 # Similar packages
 
 A more established and tested package for computing of interaction terms is [CellListMap.jl](https://github.com/m3g/CellListMap.jl).
+
+
+# Benchmarks [work in progress]
+
+This package is probably not faster than [CellListMap.jl](https://github.com/m3g/CellListMap.jl) 
+but provides an easier interface at the moment.
+
+```julia
+
