@@ -26,6 +26,17 @@ module SpatialHashTables
         return SpatialHashTable(cellcount, particlemap, domain, grid, spacing, linear_indices, cartesian_indices)
     end 
     
+    function SpatialHashTable(range::AbstractArray, grid, n_positions)
+        d = length(range)
+        domain = (min = SVector{d, Float64}(fill(0,d)), max = SVector{d, Float64}(range...))
+        cellcount = Vector{Int64}(undef, prod(grid)+1)
+        particlemap = Vector{Int64}(undef, n_positions)
+        spacing = (domain.max - domain.min) ./ grid
+        linear_indices = LinearIndices(grid)
+        cartesian_indices = CartesianIndices(grid)
+        return SpatialHashTable(cellcount, particlemap, domain, grid, spacing, linear_indices, cartesian_indices)
+    end
+
     function SpatialHashTable(domain, grid, X::AbstractVector)
         ht = SpatialHashTable(domain, grid, length(X))
         updateboxes!(ht, X)
@@ -50,24 +61,23 @@ module SpatialHashTables
         resize!(ht.particlemap, n_positions)
     end
     
-    function iterate_box(ht::SpatialHashTable, box_index) 
+    @inline function iterate_box(ht::SpatialHashTable, box_index) 
         box_start = ht.cellcount[box_index] + 1
         box_end = ht.cellcount[box_index+1]
         return ( ht.particlemap[k] for k in box_start:box_end )
     end 
     
-    function neighbouring_boxes(ht::SpatialHashTable{N}, box_index, r) where N
+    @inline function neighbouring_boxes(ht::SpatialHashTable{N}, box_index, r) where N
         width = ceil(Int64, r / minimum(ht.spacing) )
-        offsets = CartesianIndices( (-width:width, -width:width) )
+        offsets = CartesianIndices( ntuple( i -> -width:width, N) )
         box = ht.cartesian_indices[box_index]
         return ( ht.linear_indices[box + offset] for offset in offsets if checkbounds(Bool, ht.linear_indices, box + offset) )
     end
     
-    function neighbours(ht::SpatialHashTable, pos, r)
+    @inline function neighbours(ht::SpatialHashTable, pos, r)
         box = boxindex(ht, pos)
         return ( k for bj in neighbouring_boxes(ht, box, r) for k in iterate_box(ht, bj) )
     end
 
     export SpatialHashTable, updateboxes!, resize!, neighbours, boxindex, neighbouring_boxes, iterate_box
-
 end
