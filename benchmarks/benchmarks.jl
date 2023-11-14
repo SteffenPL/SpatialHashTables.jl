@@ -5,7 +5,7 @@ using CellListMap
 
 domain = (min = @SVector[0.0, 0.0, 0.0], max = @SVector[1.0, 1.0, 1.0] )
 
-N = 1000
+N = 100000
 X = [rand(SVector{3,Float64}) for i in 1:N]
 
 r = 1/sqrt(N)
@@ -51,6 +51,7 @@ end
 
 
 @time test_speed(st, X, r)
+@time test_speed_naive(st, X, r)
 
 function energy(d2, u) 
     if d2 < 0.1^2
