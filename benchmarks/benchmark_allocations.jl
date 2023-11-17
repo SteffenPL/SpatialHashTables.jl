@@ -40,9 +40,9 @@ function test_speed_naive(st, X, r)
     for i in 1:N 
         for j in 1:i-1
             xixj = X[i] - X[j]
-            d = sum(x -> x^2, xixj)
-            if d < cutoff^2
-                mean_distance += xixj ./ sqrt(d)
+            d2 = sum(x -> x^2, xixj)
+            if d2 < cutoff^2
+                mean_distance += xixj ./ sqrt(d2)
             end
         end
     end
@@ -62,20 +62,21 @@ end
 
 
 using CellListMap.PeriodicSystems
+N = 100000
 system = PeriodicSystem(
-           xpositions = rand(SVector{3,Float64},1000), 
+           xpositions = rand(SVector{3,Float64},N), 
            unitcell=[1.0,1.0,1.0], 
-           cutoff = 0.1, 
+           cutoff = r, 
            output = 0.0,
            output_name = :energy
        );
 
 using BenchmarkTools
-@btime CellListMap.PeriodicSystems.map_pairwise!( map_energy, $system; update_lists=false)
+@btime CellListMap.PeriodicSystems.map_pairwise!( $map_energy, $system; update_lists=false)
 
 
 map_energy(x,y,i,j,d2,u) = energy(d2, u)
-CellListMap.PeriodicSystems.map_pairwise!(map_energy, system)
+@time CellListMap.PeriodicSystems.map_pairwise!(map_energy, system)
 
 @inline interation_pairs(ht, X, cutoff) = ( (i,j) for i in eachindex(X) for j in neighbours(ht, X[i], cutoff) )
 function test_speed(st, X, cutoff)
@@ -116,8 +117,15 @@ N = length(X)
 st = SpatialHashTable( domain , grid, N)
 updateboxes!(st, X)
 
-test_speed(st, X, system.cutoff)
-test_ref(X, system.cutoff)
+@time test_speed(st, X, system.cutoff)
+@time CellListMap.PeriodicSystems.map_pairwise!(map_energy, system; update_lists=false)
+
+@btime test_speed($st, $X, $(system.cutoff))
+@time test_ref(X, system.cutoff)
+
+@profview CellListMap.PeriodicSystems.map_pairwise!(map_energy, system; update_lists=false)
+@profview test_speed(st, X, system.cutoff)
+
 
 
 system = PeriodicSystem(

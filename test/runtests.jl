@@ -5,9 +5,8 @@ using Test
 const SVec2 = SVector{2, Float64}
 
 @testset "SpatialHashTables.jl" begin
-    # Write your tests here.
 
-
+    
     X = rand(SVec2, 100)
     domain = (min = SVec2(0, 0), max = SVec2(1, 1))
     grid = (5, 5)
