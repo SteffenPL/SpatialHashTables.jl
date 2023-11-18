@@ -1,7 +1,54 @@
+using Revise
 using StaticArrays 
 using SpatialHashTables 
 using CellListMap
 
+
+using SpatialHashTables: neighbouring_boxes, iterate_box, hashindex, gridindices, boxindex
+include("setup.jl")  # defines: N, X,
+
+N, r, X, energy = setup(10_000)
+
+ht = BoundedHashTable(X, r, [1.0, 1.0, 1.0])
+
+gridpos = gridindices(ht, X[1])
+Dim = dimension(ht)
+
+boxhash = hashindex(ht, gridpos)
+collect(iterate_box(ht, boxhash))
+
+function test_a(ht, X, r)
+    r = 0
+    for x in X
+    gp = gridindices(ht, x)
+    nbx = neighbouring_boxes(ht, gp, r)
+    for nb in nbx
+        r += 1
+    end
+end 
+    return r 
+end
+@profview test_a(ht, X, r)
+
+
+x = X[3]
+
+gp = gridindices(ht, x)
+nbx = neighbouring_boxes(ht, gp, r)
+
+@code_warntype neighbouring_boxes(ht, gp, 0.01)
+collect(nbx)
+
+Dim = dimension(ht)
+
+widths = @. ceil(Int64, r * ht.inv_cellsize)
+ntuple(i -> -widths[i]:widths[i], Dim)
+
+int_offsets = Iterators.product(ntuple(i -> -widths[i]:widths[i], Dim)...)
+
+
+
+@code_w 
 
 domain = (min = @SVector[0.0, 0.0, 0.0], max = @SVector[1.0, 1.0, 1.0] )
 
