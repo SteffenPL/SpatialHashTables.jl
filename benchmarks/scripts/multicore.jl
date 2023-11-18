@@ -1,72 +1,41 @@
-using StaticArrays 
-using SpatialHashTables 
-using CellListMap
+using StaticArrays, SpatialHashTables, CellListMap, Test, BenchmarkTools
 
+include("setup.jl")  # defines: N, X, 
+N, Dim, r, X = setup(10_000, 3)
 
-
-using CellListMap.PeriodicSystems
-N = 100000
-const r = 5/sqrt(N)
-
-system = PeriodicSystem(
-           xpositions = [ r .+ x*(1-2*r) for x in rand(SVector{3,Float64},N)], 
-           unitcell=[1.0,1.0,1.0], 
-           cutoff = r, 
-           output = 0.0,
-           output_name = :energy
-       );
-
-
-function energy(d2, u) 
-    if d2 < r^2
-        u += atan(d2) 
+function energy(x, y, i, j, d2, u)
+    if d2 < 0.02^2
+        u += dist_sq(x, y)
     end
     return u 
 end
 
+system = setup_celllistmap(X, r, energy)
+bht = BoundedHashTable(X, r, ones(Dim))
+sht = SpatialHashTable(X, 5000, r)
 
-function map_energy(x,y,i,j,d2,u) 
-    energy(d2, u)
-end
+function test_parallel(ht, X, r)
+    e = zeros(Threads.nthreads())
 
-
-function test_speed(st, X, cutoff)
-    e = 0.0
-    N = length(X)
-    red = zeros(Threads.nthreads())
     Threads.@threads for i in eachindex(X)
-        for j in neighbours(st, X[i], cutoff)
+        tid = Threads.threadid()
+        for j in neighbours(ht, X[i], r)
             if i < j
-                d2 = sum( x -> x^2, X[i] - X[j])
-                if d2 < cutoff^2
-                    e += atan(d2)
-                end
+                e[tid] = energy(X[i], X[j], i, j, dist_sq(X[i], X[j]), e[tid])
             end
         end
     end
-    e
+    return sum(e)
 end
 
-# warm up
-CellListMap.PeriodicSystems.map_pairwise!(map_energy, system)
-r1 = CellListMap.PeriodicSystems.map_pairwise!(map_energy, system; update_lists=false)
+@test test_parallel(bht, X, r) ≈ map_pairwise!(energy, system)
+@test test_parallel(sht, X, r) ≈ map_pairwise!(energy, system)
 
-domain = (min = @SVector[0.0,0.0,0.0], max = @SVector[1.0,1.0,1.0])
-grid = tuple( ceil.(Int64, (domain.max - domain.min) / system.cutoff / 2 )... )
-X = system.xpositions
+@btime test_parallel($bht, $X, $r) 
+# 497.320 μs (242 allocations: 32.38 KiB)
 
-st = SpatialHashTable( domain , grid, N)
-updateboxes!(st, X)
+@btime test_parallel($sht, $X, $r) 
+# 1.431 ms (242 allocations: 29.38 KiB)
 
-# warm up
-r2 = test_speed(st, X, system.cutoff)
-
-
-@assert r1 ≈ r2
-
-@time CellListMap.PeriodicSystems.map_pairwise!(map_energy, system; update_lists=false)
-@time test_speed(st, X, system.cutoff)
-
-# using BenchmarkTools
-# @btime test_speed($st, $X, $(system.cutoff))
-# @btime CellListMap.PeriodicSystems.map_pairwise!($map_energy, $system; update_lists=false)
+@btime map_pairwise!($energy, $system; update_lists=false) 
+# 255.188 μs (266 allocations: 50.25 KiB)

@@ -62,8 +62,11 @@ end
     SpatialHashTable(X, 5, (0.5,0.5))
     SpatialHashTable(X, 5, 0.5)
     SpatialHashTable(X, 1, [1.0, 1.0])
+end
 
-    pr = [1,5,2,3]
-    X = rand(SVector{4,Float64}, 10)
-    SpatialHashTable(X, 5, 0.5, pr)
+@testset "Hash index collisions" begin 
+    X = rand(SVec2, 100)
+    ht = SpatialHashTable(X, 2, 0.1)
+
+    @test allunique(neighbours(ht, X[1], 0.1))
 end

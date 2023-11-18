@@ -1,4 +1,4 @@
-This package implements spatial hash tables in Julia. 
+This package implements [spatial hash tables](https://matthias-research.github.io/pages/publications/tetraederCollision.pdf) in Julia. 
 
 The main application is to compute fast short-range interaction forces (like gravity, repulsion, etc...) between particles while avoiding $\mathcal{O}(N^2)$ runtime. The scope is comparable to the excellent [CellListMap.jl](https://github.com/m3g/CellListMap.jl).
 

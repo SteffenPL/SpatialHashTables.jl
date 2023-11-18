@@ -546,7 +546,7 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 version = "1.10.0"
 
 [[deps.SpatialHashTables]]
-deps = ["StaticArrays"]
+deps = ["Adapt", "StaticArrays"]
 path = "/home/plunder/.julia/dev/SpatialHashTables"
 uuid = "894afd4e-5c6f-4d1a-a294-873acbd0e95c"
 version = "0.1.0"

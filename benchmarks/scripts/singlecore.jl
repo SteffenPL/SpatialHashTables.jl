@@ -1,11 +1,10 @@
-using StaticArrays, SpatialHashTables, CellListMap, Test
+using StaticArrays, SpatialHashTables, CellListMap, Test, BenchmarkTools
 
 include("setup.jl")  # defines: N, X, 
-
 N, Dim, r, X = setup(10_000, 3)
 
-function energy(x, y, i, j, d2, u) 
-    if 0 < d2 < 0.02^2
+function energy(x, y, i, j, d2, u)
+    if i < j && d2 < 0.02^2
         u += dist_sq(x, y)
     end
     return u 
@@ -14,8 +13,8 @@ end
 system = setup_celllistmap(X, r, energy)
 system.parallel = false
 
-ht = BoundedHashTable(X, r, ones(Dim))
-ht = SpatialHashTable(X, 500, r)
+bht = BoundedHashTable(X, r, ones(Dim))
+sht = SpatialHashTable(X, 5000, r)
 
 function test_serial(ht, X, r)
     e = 0.0
@@ -23,16 +22,21 @@ function test_serial(ht, X, r)
         for j in neighbours(ht, X[i], r)
             if i < j
                 d2 = dist_sq(X[i], X[j])
-                e = energy(X[i], X[j], i, j, d2, e)
+                e = energy(X[i], X[j], i, j, dist_sq(X[i], X[j]), e)
             end
         end
     end
     e
 end
-@test test_serial(ht, X, r) ≈ map_pairwise!(energy, system)
 
-collect(neighbours(ht, X[1], r))
+@test test_serial(bht, X, r) ≈ map_pairwise!(energy, system)
+@test test_serial(sht, X, r) ≈ map_pairwise!(energy, system)
 
-using BenchmarkTools
-@btime test_serial($ht, $X, $r)
-@btime map_pairwise!($energy, $system; update_lists=false)
+@btime test_serial($bht, $X, $r) 
+# 3.428 ms (0 allocations: 0 bytes)
+
+@btime test_serial($sht, $X, $r) 
+# 9.463 ms (0 allocations: 0 bytes)
+
+@btime map_pairwise!($energy, $system; update_lists=false) 
+# 4.147 ms (0 allocations: 0 bytes)

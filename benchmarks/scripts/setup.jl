@@ -3,9 +3,10 @@ using CellListMap.PeriodicSystems: map_pairwise!
 
 dist_sq(a,b) = sum(x -> x^2, a - b)
 
-function setup(N, Dim = 3, r = 1/(N)^(1/Dim))
+function setup(N, Dim = 3, r = 1/(N)^(1/Dim); dtype = Float64)
 
-    X = rand(SVector{Dim,Float64},N)
+    r = dtype(r)
+    X = rand(SVector{Dim,dtype},N)
     X = [clamp.(x, r, 1-r) for x in X]  # avoid periodic boundary 
 
     return N, Dim, r, X
