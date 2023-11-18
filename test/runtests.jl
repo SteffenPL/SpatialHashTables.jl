@@ -2,47 +2,68 @@ using SpatialHashTables
 using StaticArrays
 using Test
 
+using SpatialHashTables: hashindex, gridindices
+
 const SVec2 = SVector{2, Float64}
 
 @testset "SpatialHashTables.jl" begin
-
+        
+    N = 1000
+    X = rand(SVec2, N)
+    cutoff = 1/sqrt(N)
+    cellsize = cutoff
     
-    X = rand(SVec2, 100)
-    domain = (min = SVec2(0, 0), max = SVec2(1, 1))
-    grid = (5, 5)
+    range = [1.0, 2.0]
+    ht = BoundedHashTable(X, cellsize, range)
 
-    ht = SpatialHashTable(domain, grid, length(X))
-    updateboxes!(ht, X)
+    @test dimension(ht) == 2
+    @test hashindex(ht, (1, 1)) == 1
+    @test hashindex(ht, (2, 1)) == 2
 
-    X = rand(SVec2, 1000)
-    domain = (min = SVec2(0, 0), max = SVec2(1, 1))
-    grid = (5, 5)
+    @test_throws BoundsError hashindex(ht, (0,0))
 
-    resize!(ht, length(X))
     updateboxes!(ht, X)
 
     nb = collect(neighbours(ht, X[1], 0.1))
     real_nb = [i for i in eachindex(X) if sqrt(sum( x -> x^2, X[i] - X[1])) < 0.1]
 
     @test issubset(real_nb, nb)
+
+    cellsize = SVec2(0.1,0.1)
+    tablesize = 100
+    sht = SpatialHashTable(length(X), tablesize, cellsize)
+
+
+    updateboxes!(sht, X)
+
+    nb = collect(neighbours(sht, X[1], 0.1))
+    real_nb = [i for i in eachindex(X) if sqrt(sum( x -> x^2, X[i] - X[1])) < 0.1]
+
+    @test issubset(real_nb, nb)
 end
 
+@testset "BoundedHashTable" begin 
+    BoundedHashTable(10, (2,2), [1.0, 1.0])
+    BoundedHashTable(10, (2,2), [1.0, 1.0], [2.0, 2.0])
+    BoundedHashTable(10, 1.0, [1.0, 1.0])
 
-#= 
-
-function get_speed(ht, N)
-    X = rand(SVec2, N)
-    resize!(ht, length(X))
-    updateboxes!(ht, X)
-
-    return @elapsed( sum( X[i][1] - X[j][1] for i in eachindex(X) for j in neighbours(ht, X[i], 0.1) ) )
+    X = rand(SVec2, 10)
+    BoundedHashTable(X, (2,2), [1.0, 1.0])
+    BoundedHashTable(X, (2,2), [0.0, 0.0], [2.0, 2.0])
+    BoundedHashTable(X, 1.0, [1.0, 1.0])
 end
 
-Ns = round.(Int64, 2 .^ (1:14))
+@testset "SpatialHashTable" begin 
+    SpatialHashTable(10, 5, (0.5,0.5))
+    SpatialHashTable(10, 5, 0.5)
+    SpatialHashTable(10, 1, [1.0, 1.0])
 
-s = [get_speed(ht, N) for N in Ns]
+    X = rand(SVec2, 10)
+    SpatialHashTable(X, 5, (0.5,0.5))
+    SpatialHashTable(X, 5, 0.5)
+    SpatialHashTable(X, 1, [1.0, 1.0])
 
-
-s ./ Ns
-
-=#
+    pr = [1,5,2,3]
+    X = rand(SVector{4,Float64}, 10)
+    SpatialHashTable(X, 5, 0.5, pr)
+end
