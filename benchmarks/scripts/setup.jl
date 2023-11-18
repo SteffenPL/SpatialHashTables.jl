@@ -8,16 +8,8 @@ function setup(N, Dim = 3, r = 1/(N)^(1/Dim))
     X = rand(SVector{Dim,Float64},N)
     X = [clamp.(x, r, 1-r) for x in X]  # avoid periodic boundary 
 
-    function energy(x, y, i, j, d2, u) 
-        if 0 < d2 < r^2
-            u += dist_sq(x,y)
-        end
-        return u 
-    end
-
-    return N, Dim, r, X, energy
+    return N, Dim, r, X
 end
-
 
 function setup_celllistmap(X, cutoff, map_energy)
     system = PeriodicSystem(

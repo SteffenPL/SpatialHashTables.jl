@@ -14,7 +14,7 @@ struct BoundedHashTable{Dim,VT<:AbstractVector,FT<:AbstractFloat} <: AbstractSpa
     inv_cellsize::SVector{Dim,FT}
 
     linear_indices::LinearIndices{Dim,NTuple{Dim,Base.OneTo{Int64}}}
-    cartesian_indices::CartesianIndices{Dim,NTuple{Dim,Base.OneTo{Int64}}}
+    gridsize::NTuple{Dim,Int64} # CartesianIndices{Dim,NTuple{Dim,Base.OneTo{Int64}}}
 end
 
 struct SpatialHashTable{Dim,VT<:AbstractVector,FT<:AbstractFloat} <: AbstractSpatialHashTable
@@ -39,9 +39,9 @@ function BoundedHashTable(N::Int64, grid::Tuple, domainstart::SVector, domainend
     inv_cellsize = grid ./ (domainend - domainstart)
 
     linear_indices = LinearIndices(grid)
-    cartesian_indices = CartesianIndices(grid)
+    #cartesian_indices = CartesianIndices(grid)
 
-    return BoundedHashTable(cellcount, particlemap, domainstart, domainend, inv_cellsize, linear_indices, cartesian_indices)
+    return BoundedHashTable(cellcount, particlemap, domainstart, domainend, inv_cellsize, linear_indices, grid)
 end
 
 function BoundedHashTable(N::Int64, grid, domainstart, domainend)
@@ -86,15 +86,12 @@ end
 SpatialHashTable(N::Int64, tablesize::Int64, cellsize, args...) = SpatialHashTable(N, tablesize, SVector{length(cellsize),Float64}(cellsize), args...)
 
 function SpatialHashTable(N::Int64, tablesize::Int64, cutoff::Number, Dim::Int64, args...)
-    inv_cellsize = @SVector(zeros(Dim)) ./ cutoff
-    return SpatialHashTable(N, tablesize, inv_cellsize, args...)
+    return SpatialHashTable(N, tablesize, fill(cutoff, Dim), args...)
 end
 
 function SpatialHashTable(X::AbstractVector, tablesize::Int64, cutoff::Number, args...)
-    N = length(X)
     Dim = length(X[1])
-    inv_cellsize = @SVector(ones(Dim)) ./ cutoff
-    ht =  SpatialHashTable(N, tablesize, inv_cellsize, args...)
+    ht = SpatialHashTable(length(X), tablesize, cutoff, Dim, args...)
     updateboxes!(ht, X)
     return ht
 end
@@ -105,15 +102,18 @@ function SpatialHashTable(X::AbstractVector, args...)
     return ht
 end
 
+
+
+
 function updateboxes!(ht::AbstractSpatialHashTable, X)
     ht.cellcount .= 0
     for i in eachindex(X)
-        ht.cellcount[boxindex(ht, X[i])] += 1
+        ht.cellcount[hashposition(ht, X[i])] += 1
     end
     cumsum!(ht.cellcount, ht.cellcount)
 
     for i in eachindex(X)
-        box = boxindex(ht, X[i])
+        box = hashposition(ht, X[i])
         ht.particlemap[ht.cellcount[box]] = i
         ht.cellcount[box] -= 1
     end
@@ -127,37 +127,18 @@ end
 
 
 
-@inline function insidegrid(ht::BoundedHashTable, gridpos)
-    grid = size(ht.cartesian_indices)
-    return all(@.( 0 < gridpos <= grid) )
-end
+insidegrid(ht::BoundedHashTable, gridpos) = all(@. 1 <= gridpos <= ht.gridsize)
+gridindices(ht::BoundedHashTable, pos) = ceil.(Int64, (pos - ht.domainstart) .* ht.inv_cellsize)
+hashindex(ht::BoundedHashTable, gridindices) = ht.linear_indices[gridindices...]
 
-function insidegrid(::AbstractSpatialHashTable, gridpos)
-    return true
-end
-
-@inline function gridindices(ht::BoundedHashTable, pos)
-    return ceil.(Int64, (pos - ht.domainstart) .* ht.inv_cellsize)
-end
-
-function gridindices(ht::SpatialHashTable, pos)
-    return ceil.(Int64, @. pos * ht.inv_cellsize)
-end
-
-function hashindex(ht::BoundedHashTable, gridindices)
-    return ht.linear_indices[gridindices...]
-end
+insidegrid(::SpatialHashTable, gridpos) = true
+gridindices(ht::SpatialHashTable, pos) = ceil.(Int64, @. pos * ht.inv_cellsize)
 
 function hashindex(ht::SpatialHashTable, gridindices)
     return 1 + mod(abs(reduce(⊻, gridindices .* ht.pseudorandom_factors)), ht.tablesize)
 end
 
-function boxindex(ht::AbstractSpatialHashTable, pos)
-    return hashindex(ht, gridindices(ht, pos))
-end
-
-
-
+hashposition(ht::AbstractSpatialHashTable, pos) = hashindex(ht, gridindices(ht, pos))
 
 
 
@@ -170,19 +151,10 @@ end
 function neighbouring_boxes(ht::AbstractSpatialHashTable, gridpos, r)
     Dim = dimension(ht)
     widths = @. ceil(Int64, r * ht.inv_cellsize)
-
-    int_offsets = ( (-1,-1), (0,-1), (1,-1), (-1,0), (0,0), (1,0), (-1,1), (0,1), (1,1) )
-    #CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
-    offsets = (gridpos .+ i for i in int_offsets)
-    return (hashindex(ht, offset) for offset in offsets if insidegrid(ht, offset))
-end
-
-function neighbouring_boxes(ht::BoundedHashTable{Dim}, box, r) where {Dim}
-    width = ceil(Int64, r * minimum(ht.inv_cellsize) )
-
-    offsets = CartesianIndices( ntuple( i -> -width:width, Dim) )
     
-    return ( ht.linear_indices[box .+ offset] for offset in offsets if checkbounds(Bool, ht.linear_indices, box .+ offset) )
+    int_offsets = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
+    offsets = (gridpos .+ Tuple(i) for i in int_offsets)
+    return (hashindex(ht, offset) for offset in offsets if insidegrid(ht, offset))
 end
 
 function neighbours(ht::AbstractSpatialHashTable, pos, r)
