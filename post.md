@@ -1,31 +1,38 @@
-This package implements [spatial hash tables](https://matthias-research.github.io/pages/publications/tetraederCollision.pdf) in Julia. 
+This package implements a cell list methods via [spatial hash tables](https://matthias-research.github.io/pages/publications/tetraederCollision.pdf) in Julia. 
 
-The main application is to compute fast short-range interaction forces (like gravity, repulsion, etc...) between particles while avoiding $\mathcal{O}(N^2)$ runtime. The scope is comparable to the excellent [CellListMap.jl](https://github.com/m3g/CellListMap.jl).
+The main application is iterations over pairs of closeby particles to compute short-range **interaction forces between particles** for large particle systems. The aim is similar to that of the excellent [CellListMap.jl](https://github.com/m3g/CellListMap.jl) package. 
 
-Since a new package is only worth writing if it offers something new: The main difference is that SpatialHashTables.jl is designed with a more minimalistic interface and adapted to GPUs. 
-
-As of now, the highlights of SpatialHashTables.jl are:
-- Unbounded domains 
-- GPU support
-- `for`-loop style iteration over closeby pairs of points
-- Only 150 lines of code :) 
+As of now, the main features of [SpatialHashTables.jl](https://github.com/SteffenPL/SpatialHashTables.jl) are:
+- Supports **unbounded domains** and also bounded domains,
+- GPU implementation possible (but work in progress...),
+- `for`-loop style iteration,
+- Only 200 lines of code. :D
 
 Features which are currently not present:
-- No support for periodic domains
-- In parallel context: Sometimes, the user might need to implement a reduce operation manually.
-- Each pair is visited twice (i.e. `(i,j)` and `(j,i)`)
+- GPU performance not optimal yet,
+- No support for periodic domains,
+- Each pair is visited twice (i.e. `(i,j)` and `(j,i)`),
+- User has to write parallelization code (see below).
 
 ## How does it work?
 
-On the technical side, one first discretizes the spatial domain into a grid of cells $\mathbb{R}^d \to \mathbb{Z}^d$ and then uses a hash function $\mathbb{Z}^d \to \{1,\dots,q\}$ to map each point to a cell in a grid. If two cells have the same hash, it just means that one iterates over more particles than necessary, but in return, one does not need to restrict the domain size. 
+ The main idea is to hash functions $\mathbb{R}^{d} \to \{1,\dots,\texttt{tablesize}\}$ to partition an unbounded domain into `tablesize` many unions of axis aligned boxes. See [here](https://matthias-research.github.io/pages/publications/tetraederCollision.pdf) for details of the method. Spatial hash tables are well-known and popular in the computer graphics community, for example most recently as a feature of the [NVIDIA Python Warp](https://developer.nvidia.com/warp-python) framework.
 
-This idea is well-known and popular in the computer graphics community and used for example in the examples of [NVIDIA Warp](https://developer.nvidia.com/warp-python).
+On bounded domains, we use the same datastructure as proposed for spatial hash tables, which is different than the datastructure used in [CellListMap.jl](https://github.com/m3g/CellListMap.jl).
 
 ## Is it fast?
 
-Below are a few examples for single threaded CPU, multithreaded CPU and GPU usage, as well as a comparison to CellListMap.jl. See also: LINK!
+Below are a few examples for serial CPU, multithreaded CPU and GPU usage. For scripts, timings an a short comparison with CellListMap, check out the full scripts [here](https://github.com/SteffenPL/SpatialHashTables.jl/tree/main/benchmarks).
 
-## Examples 
+In short: 
+- _On bounded domains:_ The new `BoundedHashTable` type has similar speed as `PeriodicSystem` from CellListMap.jl.
+- _On unbounded domains:_ The `SpatialHashTable` is only a bit slower than the bounded counterpart, but provides more flexibility and will be preferable in sparse cases and whenever bounds are missing.
+
+GPU performance on my system `10x slower` than CPU multithreading. I'm working on it ;) 
+
+## Example usage
+
+Below, we compute $2 \sum_{i,j} \Vert X_i - X_j \Vert$ for given points $X_1,\dots,X_N \in \mathbb{R}^3$. The code can easily be adapted for other computations.
 
 ### Setup
 
@@ -33,24 +40,37 @@ Below are a few examples for single threaded CPU, multithreaded CPU and GPU usag
 using StaticArrays, SpatialHashTables
 
 N = 10_000
-r = 1/sqrt(N)
+r = 1/N^(1/3)
 X = rand(SVector{Float64,3}, N)
 
-tablesize = 100
-spacing = @SVector[ 2*r, 2*r, 2*r ]
-ht = SpatialHashTable(X, tablesize, spacing)
+domain = (1.0, 1.0, 1.0)  # only needed for bounded domains
+bht = BoundedHashTable(X, r, domain)  
+#         r : spatial size of cells, e.g. [0,r] x [0,r] x [0,r]
+
+tablesize = 5000
+sht = SpatialHashTable(X, tablesize, r)
+# tablesize : the number of partitions/hash indices
+#         r : spatial size of cells
+```
+There are also more general constructors. See the [docs](https://SteffenPL.github.io/SpatialHashTables.jl/dev/).
+
+### Updating the hash table
+
+If the positions change, one can simply call `updateboxes!` to update the hash table. This is done in $\mathcal{O}(n)$ time and allocation free:
+```julia
+updateboxes!(bht, X)  # bounded domains; error if X[i] outside!
+updateboxes!(sht, X)  # unbounded domains
 ```
 
 ### CPU Serial
 
 ```julia
-# Single code
 res = 0.0
 for i in eachindex(X)
-    for j in neighbours(ht, X[i], r)
+    for j in neighbours(sht, X[i], r)
         d = sum(x -> x^2, X[i] - X[j])
         if d < r^2
-           res += 1/d
+           res += sqrt(d)  # ... main computation
         end
     end
 end
@@ -58,14 +78,14 @@ end
 
 ### CPU Parallel
 
+The user has to write his own parallelization code. This provides in return more flexibility and control, but requires a bit more work.
 ```julia
-# Multithreaded
 res_mt = zeros(Threads.nthreads())
 Threads.@threads for i in eachindex(X)
-    for j in neighbours(ht, X[i], r)
+    for j in neighbours(sht, X[i], r)
         d = sum(x -> x^2, X[i] - X[j])
         if d < r^2
-           res_mt[i] += 1/d
+           res_mt[i] += sqrt(d)  # ... main computation
         end
     end
 end
@@ -74,27 +94,37 @@ res = sum(res_mt)
 
 ### GPU
 
+Essentially the same pattern as before applies also for GPU code. At the moment only `BoundedHashTable` is supported on the GPU.
 ```julia
 using CUDA
-Y = cu(X)
-ht_gpu = cu(ht)
+using CUDA: i32 
 
-function kernel(ht, X, r)
-    i = (blockIdx().x-1) * blockDim().x + threadIdx().x
-    if i > length(X)
-        return
-    end
+# convert to GPU friendly types
+X_gpu = cu(X)
+ht_gpu = cu(bht)
 
-    for j in neighbours(ht, X[i], r)
-        d = sum(x -> x^2, X[i] - X[j])
-        if d < r^2
-           atomicAdd!(res, 1/d)
+function gpu_kernel!(ht, X, r, res)
+    index = (blockIdx().x - 1i32) * blockDim().x + threadIdx().x
+    stride = gridDim().x * blockDim().x
+
+    for i in index:stride:Int32(length(X))
+        res[i] = 0.0f0
+        for j in neighbours(ht, X[i], r)        
+            d2 = dist_sq(X[i], X[j]) 
+            # ... main computation
+            res[i] += ifelse(d2 < r^2, sqrt(d2), 0.0f0)  
         end
     end
+    return nothing
 end
 
-res = 0.0
-@cuda threads=256 kernel(ht_gpu, Y, r)
+
+threads = 256
+blocks = cld(N, threads)
+
+res_gpu = CUDA.zeros(length(X))
+@cuda threads=threads blocks=blocks gpu_kernel!(bht_gpu, X_gpu, r, res_gpu)
+res = sum(res_gpu)
 ```
 ---
 PS: @lmiq If some of these things are interesting for your package, let me know. It was easier for me to test this from scratch, but in principle I would be happy if the good parts from this idea merge into CellListMap.jl.

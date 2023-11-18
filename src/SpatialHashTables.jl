@@ -36,7 +36,7 @@ dimension(::BoundedHashTable{Dim}) where {Dim} = Dim
 inttype(ht::AbstractSpatialHashTable) = eltype(ht.cellcount)
 
 function BoundedHashTable(N::Integer, grid::Tuple, domainstart::SVector, domainend::SVector)
-    
+
     cellcount = Vector{typeof(N)}(undef, prod(grid) + 1)
     particlemap = Vector{typeof(N)}(undef, N)
 
@@ -74,7 +74,7 @@ end
 
 const default_factors = (92837111, 689287499, 283923481)
 
-function SpatialHashTable(N::Int64, tablesize::Int64, cellsize::SVector; cachesize = Threads.nthreads(),  pseudorandomfactors = default_factors)
+function SpatialHashTable(N::Int64, tablesize::Int64, cellsize::SVector; cachesize=Threads.nthreads(), pseudorandomfactors=default_factors)
     cellcount = Vector{Int64}(undef, tablesize + 2) # we need one extra for Julia type stability...
     particlemap = Vector{Int64}(undef, N)
 
@@ -83,7 +83,7 @@ function SpatialHashTable(N::Int64, tablesize::Int64, cellsize::SVector; cachesi
     Dim = length(cellsize)
     pseudorandomfactors = SVector{Dim,Int64}(pseudorandomfactors[i] for i in eachindex(inv_cellsize))
 
-    caches = [ Set{Int64}() for i in 1:cachesize ]
+    caches = [Set{Int64}() for i in 1:cachesize]
 
     return SpatialHashTable(cellcount, particlemap, tablesize, inv_cellsize, pseudorandomfactors, caches)
 end
@@ -134,7 +134,7 @@ end
 
 insidegrid(ht::BoundedHashTable, gridpos) = all(@. 1 <= gridpos <= ht.gridsize)
 gridindices(ht::BoundedHashTable, pos) = ceil.(inttype(ht), (pos - ht.domainstart) .* ht.inv_cellsize)
-hashindex(ht::BoundedHashTable, gridindices) = sum( @. (gridindices-1) * ht.strides ) + 1
+hashindex(ht::BoundedHashTable, gridindices) = sum(@. (gridindices - 1) * ht.strides) + 1
 
 insidegrid(::SpatialHashTable, gridpos) = true
 gridindices(ht::SpatialHashTable, pos) = ceil.(inttype(ht), @. pos * ht.inv_cellsize)
@@ -174,7 +174,7 @@ thread_cache(ht::SpatialHashTable) = ht.caches[Threads.threadid()]
 
 function iterate_box_if(ht, boxhash, seen)
     if boxhash in seen
-        return iterate_box(ht, ht.tablesize+1)  # this box is empty (see constructor where we add +2)
+        return iterate_box(ht, ht.tablesize + 1)  # this box is empty (see constructor where we add +2)
     else
         push!(seen, boxhash)
         return iterate_box(ht, boxhash)
@@ -193,15 +193,15 @@ end
 function adapt_structure(to, bht::BoundedHashTable)
     cellcount = adapt_structure(to, Int32.(bht.cellcount))
     particlemap = adapt_structure(to, Int32.(bht.particlemap))
-    return BoundedHashTable(cellcount, 
-                            particlemap,
-                            Float32.(bht.domainstart), 
-                            Float32.(bht.domainend), 
-                            Float32.(bht.inv_cellsize), 
-                            Int32.(bht.strides), 
-                            Int32.(bht.gridsize))
+    return BoundedHashTable(cellcount,
+        particlemap,
+        Float32.(bht.domainstart),
+        Float32.(bht.domainend),
+        Float32.(bht.inv_cellsize),
+        Int32.(bht.strides),
+        Int32.(bht.gridsize))
 end
 
 
-export SpatialHashTable, BoundedHashTable, AbstractSpatialHashTable, updateboxes!, resize!, neighbours, iterate_box, dimension, inside 
+export SpatialHashTable, BoundedHashTable, AbstractSpatialHashTable, updateboxes!, resize!, neighbours, iterate_box, dimension, inside
 end
