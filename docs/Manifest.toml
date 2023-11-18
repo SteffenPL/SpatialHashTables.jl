@@ -1,8 +1,8 @@
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.9.0-rc1"
+julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "27156ee8b02109cc5dc04bd9ee2da4928f8f098d"
+project_hash = "e0c77beb18dc1f6cce661ebd60658c0c1a77390f"
 
 [[deps.ANSIColoredPrinters]]
 git-tree-sha1 = "574baf8110975760d391c710b6341da1afa48d8c"
@@ -101,11 +101,6 @@ version = "1.0.3"
 
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
-
-[[deps.SpatialHashTables]]
-path = ".."
-uuid = "894afd4e-5c6f-4d1a-a294-873acbd0e95c"
-version = "1.0.0-DEV"
 
 [[deps.TOML]]
 deps = ["Dates"]

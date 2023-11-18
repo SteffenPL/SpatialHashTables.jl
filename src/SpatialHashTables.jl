@@ -15,7 +15,7 @@ struct BoundedHashTable{Dim,VT<:AbstractVector,FT<:AbstractFloat,IT<:Integer} <:
     inv_cellsize::SVector{Dim,FT}
 
     strides::NTuple{Dim,IT}
-    gridsize::NTuple{Dim,IT} # CartesianIndices{Dim,NTuple{Dim,Base.OneTo{Int64}}}
+    gridsize::NTuple{Dim,IT}
 end
 
 struct SpatialHashTable{Dim,VT<:AbstractVector,FT<:AbstractFloat} <: AbstractSpatialHashTable
@@ -42,7 +42,7 @@ function BoundedHashTable(N::Integer, grid::Tuple, domainstart::SVector, domaine
     particlemap = Vector{typeof(N)}(undef, N)
 
     inv_cellsize = grid ./ (domainend - domainstart)
-    strides = (one(eltype(grid)), cumprod(grid[1:end-1])...)
+    strides = (oneunit(eltype(grid)), cumprod(grid[1:end-1])...)
 
     return BoundedHashTable(cellcount, particlemap, domainstart, domainend, inv_cellsize, strides, grid)
 end
