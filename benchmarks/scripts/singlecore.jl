@@ -1,10 +1,11 @@
+using Revise
 using StaticArrays, SpatialHashTables, CellListMap, Test, BenchmarkTools
 
 include("setup.jl")  # defines: N, X, 
 N, Dim, r, X = setup(10_000, 3)
 
 function energy(x, y, i, j, d2, u)
-    if i < j && d2 < 0.02^2
+    if d2 < 0.02^2
         u += dist_sq(x, y)
     end
     return u 
@@ -33,7 +34,7 @@ end
 @test test_serial(sht, X, r) ≈ map_pairwise!(energy, system)
 
 @btime test_serial($bht, $X, $r) 
-# 3.428 ms (0 allocations: 0 bytes)
+# 3.060 ms (0 allocations: 0 bytes)
 
 @btime test_serial($sht, $X, $r) 
 # 9.463 ms (0 allocations: 0 bytes)

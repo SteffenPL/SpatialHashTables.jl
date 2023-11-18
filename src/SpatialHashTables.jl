@@ -34,20 +34,18 @@ dimension(::SpatialHashTable{Dim}) where {Dim} = Dim
 dimension(::BoundedHashTable{Dim}) where {Dim} = Dim
 
 
-function BoundedHashTable{Dim,Vector{IT},VT,IT}(N::IT, grid::Tuple, domainstart::SVector{Dim,FT}, domainend::SVector{Dim,FT}) where {Dim,IT <: Integer,FT <: AbstractFloat}
+function BoundedHashTable(N::Integer, grid::Tuple, domainstart::SVector, domainend::SVector)
     
-    cellcount = Vector{IT}(undef, prod(grid) + 1)
-    particlemap = Vector{IT}(undef, N)
+    cellcount = Vector{typeof(N)}(undef, prod(grid) + 1)
+    particlemap = Vector{typeof(N)}(undef, N)
 
     inv_cellsize = grid ./ (domainend - domainstart)
+    strides = (one(eltype(grid)), cumprod(grid[1:end-1])...)
 
-    linear_indices = LinearIndices(grid)
-    #cartesian_indices = CartesianIndices(grid)
-
-    return BoundedHashTable(cellcount, particlemap, domainstart, domainend, inv_cellsize, linear_indices, grid)
+    return BoundedHashTable(cellcount, particlemap, domainstart, domainend, inv_cellsize, strides, grid)
 end
 
-function BoundedHashTable(N::Int64, grid, domainstart, domainend)
+function BoundedHashTable(N::Integer, grid, domainstart, domainend)
     domainstart = SVector{length(grid),Float64}(domainstart)
     domainend = SVector{length(grid),Float64}(domainend)
     return BoundedHashTable(N, grid, domainstart, domainend)
@@ -135,7 +133,7 @@ end
 
 insidegrid(ht::BoundedHashTable, gridpos) = all(@. 1 <= gridpos <= ht.gridsize)
 gridindices(ht::BoundedHashTable, pos) = ceil.(Int64, (pos - ht.domainstart) .* ht.inv_cellsize)
-hashindex(ht::BoundedHashTable, gridindices) = ht.linear_indices[gridindices...]
+hashindex(ht::BoundedHashTable, gridindices) = sum( @. (gridindices-1) * ht.strides ) + 1
 
 insidegrid(::SpatialHashTable, gridpos) = true
 gridindices(ht::SpatialHashTable, pos) = ceil.(Int64, @. pos * ht.inv_cellsize)

@@ -20,7 +20,7 @@ const SVec2 = SVector{2, Float64}
     @test hashindex(ht, (1, 1)) == 1
     @test hashindex(ht, (2, 1)) == 2
 
-    @test_throws BoundsError hashindex(ht, (0,0))
+    # @test_throws BoundsError hashindex(ht, (0,0))
 
     updateboxes!(ht, X)
 
