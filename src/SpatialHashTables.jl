@@ -34,7 +34,6 @@ dimension(::SpatialHashTable{Dim}) where {Dim} = Dim
 dimension(::BoundedHashTable{Dim}) where {Dim} = Dim
 
 inttype(ht::AbstractSpatialHashTable) = eltype(ht.cellcount)
-one(ht::AbstractSpatialHashTable) = one(inttype(ht))
 
 function BoundedHashTable(N::Integer, grid::Tuple, domainstart::SVector, domainend::SVector)
     
@@ -141,7 +140,7 @@ insidegrid(::SpatialHashTable, gridpos) = true
 gridindices(ht::SpatialHashTable, pos) = ceil.(inttype(ht), @. pos * ht.inv_cellsize)
 
 function hashindex(ht::SpatialHashTable, gridindices)
-    return one(ht) + mod(abs(reduce(⊻, gridindices .* ht.pseudorandom_factors)), ht.tablesize)
+    return oneunit(inttype(ht)) + mod(abs(reduce(⊻, gridindices .* ht.pseudorandom_factors)), ht.tablesize)
 end
 
 hashposition(ht::AbstractSpatialHashTable, pos) = hashindex(ht, gridindices(ht, pos))
@@ -149,7 +148,7 @@ hashposition(ht::AbstractSpatialHashTable, pos) = hashindex(ht, gridindices(ht, 
 
 
 function iterate_box(ht::AbstractSpatialHashTable, boxhash)
-    box_start = ht.cellcount[boxhash] + one(ht)
+    box_start = ht.cellcount[boxhash] + oneunit(inttype(ht))
     box_end = ht.cellcount[boxhash+1]
     return (ht.particlemap[k] for k in box_start:box_end)
 end
