@@ -4,7 +4,6 @@ The main application is to compute fast short-range interaction forces (like gra
 
 Since a new package is only worth writing if it offers something new: The main difference is that SpatialHashTables.jl is designed with a more minimalistic interface and adapted to GPUs. 
 
-
 As of now, the highlights of SpatialHashTables.jl are:
 - Unbounded domains 
 - GPU support
