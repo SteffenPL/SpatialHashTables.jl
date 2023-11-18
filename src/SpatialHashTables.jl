@@ -33,6 +33,8 @@ end
 dimension(::SpatialHashTable{Dim}) where {Dim} = Dim
 dimension(::BoundedHashTable{Dim}) where {Dim} = Dim
 
+inttype(ht::AbstractSpatialHashTable) = eltype(ht.cellcount)
+one(ht::AbstractSpatialHashTable) = one(inttype(ht))
 
 function BoundedHashTable(N::Integer, grid::Tuple, domainstart::SVector, domainend::SVector)
     
@@ -132,14 +134,14 @@ end
 
 
 insidegrid(ht::BoundedHashTable, gridpos) = all(@. 1 <= gridpos <= ht.gridsize)
-gridindices(ht::BoundedHashTable, pos) = ceil.(Int64, (pos - ht.domainstart) .* ht.inv_cellsize)
+gridindices(ht::BoundedHashTable, pos) = ceil.(inttype(ht), (pos - ht.domainstart) .* ht.inv_cellsize)
 hashindex(ht::BoundedHashTable, gridindices) = sum( @. (gridindices-1) * ht.strides ) + 1
 
 insidegrid(::SpatialHashTable, gridpos) = true
-gridindices(ht::SpatialHashTable, pos) = ceil.(Int64, @. pos * ht.inv_cellsize)
+gridindices(ht::SpatialHashTable, pos) = ceil.(inttype(ht), @. pos * ht.inv_cellsize)
 
 function hashindex(ht::SpatialHashTable, gridindices)
-    return 1 + mod(abs(reduce(⊻, gridindices .* ht.pseudorandom_factors)), ht.tablesize)
+    return one(ht) + mod(abs(reduce(⊻, gridindices .* ht.pseudorandom_factors)), ht.tablesize)
 end
 
 hashposition(ht::AbstractSpatialHashTable, pos) = hashindex(ht, gridindices(ht, pos))
@@ -147,14 +149,15 @@ hashposition(ht::AbstractSpatialHashTable, pos) = hashindex(ht, gridindices(ht, 
 
 
 function iterate_box(ht::AbstractSpatialHashTable, boxhash)
-    box_start = ht.cellcount[boxhash] + 1
+    box_start = ht.cellcount[boxhash] + one(ht)
     box_end = ht.cellcount[boxhash+1]
     return (ht.particlemap[k] for k in box_start:box_end)
 end
 
 function neighbouring_boxes(ht::AbstractSpatialHashTable, gridpos, r)
-    Dim = dimension(ht)
-    widths = @. ceil(Int64, r * ht.inv_cellsize)
+    IT = inttype(ht)
+    Dim = IT(dimension(ht))
+    widths = @. ceil(IT, r * ht.inv_cellsize)
     int_offsets = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
     offsets = (gridpos .+ Tuple(i) for i in int_offsets)
     return (hashindex(ht, offset) for offset in offsets if insidegrid(ht, offset))
@@ -196,8 +199,8 @@ function adapt_structure(to, bht::BoundedHashTable)
                             Float32.(bht.domainstart), 
                             Float32.(bht.domainend), 
                             Float32.(bht.inv_cellsize), 
-                            bht.linear_indices, 
-                            bht.gridsize)
+                            Int32.(bht.strides), 
+                            Int32.(bht.gridsize))
 end
 
 

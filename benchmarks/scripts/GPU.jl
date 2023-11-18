@@ -68,3 +68,10 @@ end
 @time test_gpu(bht_gpu, X_gpu, r, res)
 # 0.073235 seconds (258 allocations: 13.844 KiB)
 
+
+# kernel = @cuda launch = false  gpu_kernel!(bht_gpu, X_gpu, r, res)
+# config = launch_configuration(kernel.fun)
+# threads = min(length(X_gpu), config.threads)
+# blocks = cld(length(X_gpu), threads)
+
+#CUDA.@profile trace=true @cuda threads=threads blocks=blocks gpu_kernel!(bht_gpu, X_gpu, r, res)
