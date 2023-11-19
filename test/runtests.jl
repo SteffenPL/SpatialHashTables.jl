@@ -22,7 +22,7 @@ const SVec2 = SVector{2, Float64}
 
     # @test_throws BoundsError hashindex(ht, (0,0))
 
-    updateboxes!(ht, X)
+    updatetable!(ht, X)
 
     nb = collect(neighbours(ht, X[1], 0.1))
     real_nb = [i for i in eachindex(X) if sqrt(sum( x -> x^2, X[i] - X[1])) < 0.1]
@@ -31,10 +31,10 @@ const SVec2 = SVector{2, Float64}
 
     cellsize = SVec2(0.1,0.1)
     tablesize = 100
-    sht = SpatialHashTable(length(X), tablesize, cellsize)
+    sht = SpatialHashTable(length(X), cellsize, tablesize)
 
 
-    updateboxes!(sht, X)
+    updatetable!(sht, X)
 
     nb = collect(neighbours(sht, X[1], 0.1))
     real_nb = [i for i in eachindex(X) if sqrt(sum( x -> x^2, X[i] - X[1])) < 0.1]
@@ -54,19 +54,19 @@ end
 end
 
 @testset "SpatialHashTable" begin 
-    SpatialHashTable(10, 5, (0.5,0.5))
-    SpatialHashTable(10, 5, 0.5)
-    SpatialHashTable(10, 1, [1.0, 1.0])
+    SpatialHashTable(10, (0.5,0.5), 5)
+    SpatialHashTable(10, 0.5, 5)
+    SpatialHashTable(10, [1.0, 1.0], 1)
 
     X = rand(SVec2, 10)
-    SpatialHashTable(X, 5, (0.5,0.5))
-    SpatialHashTable(X, 5, 0.5)
-    SpatialHashTable(X, 1, [1.0, 1.0])
+    SpatialHashTable(X, (0.5,0.5), 5)
+    SpatialHashTable(X, 0.5, 5)
+    SpatialHashTable(X, [1.0, 1.0], 5)
 end
 
 @testset "Hash index collisions" begin 
     X = rand(SVec2, 100)
-    ht = SpatialHashTable(X, 2, 0.1)
+    ht = SpatialHashTable(X, 0.1, 2)
 
     @test allunique(neighbours(ht, X[1], 0.1))
 end

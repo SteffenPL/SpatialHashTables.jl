@@ -15,7 +15,7 @@ system = setup_celllistmap(X, r, energy)
 system.parallel = false
 
 bht = BoundedHashTable(X, r, ones(Dim))
-sht = SpatialHashTable(X, 5000, r)
+sht = SpatialHashTable(X, r, 5000)
 
 function test_serial(ht, X, r)
     e = 0.0

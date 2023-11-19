@@ -12,7 +12,7 @@ end
 
 system = setup_celllistmap(X, r, energy)
 bht = BoundedHashTable(X, r, ones(Dim))
-sht = SpatialHashTable(X, 5000, r)
+sht = SpatialHashTable(X, r, 5000)
 
 function test_parallel(ht, X, r)
     e = zeros(Threads.nthreads())

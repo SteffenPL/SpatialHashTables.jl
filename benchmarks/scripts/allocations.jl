@@ -62,7 +62,7 @@ r = 1/sqrt(N)
 grid = (100, 100, 100)
 st = SpatialHashTable(domain, grid, N)
 
-updateboxes!(st, X)
+updatetable!(st, X)
 
 function test_speed(st, X, r)
     mean_distance = SVector{3,Float64}(0.,0.,0.0)
@@ -162,7 +162,7 @@ X = system.xpositions
 N = length(X)
 
 st = SpatialHashTable( domain , grid, N)
-updateboxes!(st, X)
+updatetable!(st, X)
 
 @time test_speed(st, X, system.cutoff)
 @time CellListMap.PeriodicSystems.map_pairwise!(map_energy, system; update_lists=false)
@@ -211,7 +211,7 @@ ht = SpatialHashTable(domain, grid, X)
 # the structure can also be resized and updated 
 X2 = rand(SVector{2, Float64}, 1000)
 resize!(ht, length(X2))
-updateboxes!(ht, X2)
+updatetable!(ht, X2)
 
 interations(ht, X, R) = ( (i,j) for i in eachindex(X) for j in neighbours(ht, X[i], R) )
 function test_allocations(ht, X, R)
