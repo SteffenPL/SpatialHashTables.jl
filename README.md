@@ -18,6 +18,11 @@ The interface is minimalistic. For a more full-featured and established package,
 
 See the [benchmarks](https://github.com/SteffenPL/SpatialHashTables.jl/tree/main/benchmarks) folder for some timings and performance comparisons.
 
+## How does it work?
+
+ The main idea is to use a hash function $\mathbb{R}^{d} \to \{1,\dots,\texttt{tablesize}\}$ to partition an unbounded domain into `tablesize` many unions of axis aligned boxes. See [Matthias Müller's paper](https://matthias-research.github.io/pages/publications/tetraederCollision.pdf) for details of the method.
+
+The indices of particles belonging to one hash index are stored indirectly, see for example [Carmen Cincotti's tutorial](https://carmencincotti.com/2022-10-31/spatial-hash-maps-part-one/). The advantage is that one can update and iterate without any allocations.
 
 ## Example usage
 
@@ -38,7 +43,7 @@ bht = BoundedHashTable(X, r, domain)
 #         r : spatial size of cells, e.g. [0,r] x [0,r] x [0,r]
 
 tablesize = 5000
-sht = SpatialHashTable(X, tablesize, r)
+sht = SpatialHashTable(X, r, tablesize)
 # tablesize : the number of partitions/hash indices
 #         r : spatial size of cells
 ```
@@ -116,3 +121,8 @@ res_gpu = CUDA.zeros(length(X))
 @cuda threads=threads blocks=blocks gpu_kernel!(bht_gpu, X_gpu, r, res_gpu)
 res = sum(res_gpu)
 ```
+
+
+## Documentation 
+
+Please let me know if the [documenation](https://img.shields.io/badge/docs-dev-blue.svg)](https://SteffenPL.github.io/SpatialHashTables.jl/dev/) is unclear or if you have any suggestions for improvements.
