@@ -36,13 +36,14 @@ Threads.@threads for i in eachindex(X)
 end
 
 res = sum(res_mt)</code></pre><p>where <code>res_mt</code> is a vector of length <code>Threads.nthreads()</code> which stores the partial results of each thread. The final result is then the sum of the partial results.</p><p>This simple code snippet can be easily adapted to other computations. One example would be  to compute forces for all particles given a potential function <code>V</code>:</p><pre><code class="language-julia hljs">F = zeros(SVector{Float64,3}, length(X))
+V(d) = 1/d^3
 
 Threads.@threads for i in eachindex(X)
     for j in neighbours(sht, X[i], r)
         d² = sum(x -&gt; x^2, X[i] - X[j])
 
         if d² &lt; r^2
-            F[i] += (X[i] - X[j]) * V(d²)
+            F[i] += (X[i] - X[j]) * V(sqrt(d²))
         end
     end
 end</code></pre><p>Note that the code runs over all particles <code>i</code> and then over all neighbours <code>j</code> of <code>i</code>. For some computations one might add a check if <code>i == j</code> to avoid self-interactions or <code>i &lt; j</code> to avoid double counting.</p><h2 id="GPU-Parallelization"><a class="docs-heading-anchor" href="#GPU-Parallelization">GPU Parallelization</a><a id="GPU-Parallelization-1"></a><a class="docs-heading-anchor-permalink" href="#GPU-Parallelization" title="Permalink"></a></h2><p>The package is not fully optimized for GPUs.  However, here is a simple example how to use the package on GPUs via <code>CUDA.jl</code>:</p><pre><code class="language-julia hljs">using CUDA, StaticArrays, SpatialHashTables
@@ -88,4 +89,4 @@ function compute_on_gpu(ht_gpu, X_gpu, r, res)
 
     # reduce step
     return sum(res)
-end</code></pre><p>At this point in thime, the performance of the GPU code is not better than of parallel CPU code.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="api/">API »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Sunday 19 November 2023 03:10">Sunday 19 November 2023</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+end</code></pre><p>At this point in thime, the performance of the GPU code is not better than of parallel CPU code.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="api/">API »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Sunday 19 November 2023 04:04">Sunday 19 November 2023</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
