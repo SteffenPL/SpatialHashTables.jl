@@ -1,2 +1,91 @@
 <!DOCTYPE html>
-<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Home · SpatialHashTables.jl</title><script data-outdated-warner src="assets/warner.js"></script><link rel="canonical" href="https://SteffenPL.github.io/SpatialHashTables.jl/"/><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href>SpatialHashTables.jl</a></span></div><form class="docs-search" action="search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>Home</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Home</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Home</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/SteffenPL/SpatialHashTables.jl/blob/main/docs/src/index.md#" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="SpatialHashTables"><a class="docs-heading-anchor" href="#SpatialHashTables">SpatialHashTables</a><a id="SpatialHashTables-1"></a><a class="docs-heading-anchor-permalink" href="#SpatialHashTables" title="Permalink"></a></h1><p>Documentation for <a href="https://github.com/SteffenPL/SpatialHashTables.jl">SpatialHashTables</a>.</p><ul></ul></article><nav class="docs-footer"><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Saturday 18 November 2023 15:42">Saturday 18 November 2023</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
+<html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width, initial-scale=1.0"/><title>Home · SpatialHashTables.jl</title><script data-outdated-warner src="assets/warner.js"></script><link rel="canonical" href="https://SteffenPL.github.io/SpatialHashTables.jl/"/><link href="https://cdnjs.cloudflare.com/ajax/libs/lato-font/3.0.0/css/lato-font.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/juliamono/0.045/juliamono.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/fontawesome.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/solid.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/brands.min.css" rel="stylesheet" type="text/css"/><link href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.24/katex.min.css" rel="stylesheet" type="text/css"/><script>documenterBaseURL="."</script><script src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.6/require.min.js" data-main="assets/documenter.js"></script><script src="siteinfo.js"></script><script src="../versions.js"></script><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-dark.css" data-theme-name="documenter-dark" data-theme-primary-dark/><link class="docs-theme-link" rel="stylesheet" type="text/css" href="assets/themes/documenter-light.css" data-theme-name="documenter-light" data-theme-primary/><script src="assets/themeswap.js"></script></head><body><div id="documenter"><nav class="docs-sidebar"><div class="docs-package-name"><span class="docs-autofit"><a href>SpatialHashTables.jl</a></span></div><form class="docs-search" action="search/"><input class="docs-search-query" id="documenter-search-query" name="q" type="text" placeholder="Search docs"/></form><ul class="docs-menu"><li class="is-active"><a class="tocitem" href>Home</a><ul class="internal"><li><a class="tocitem" href="#Core-interface"><span>Core interface</span></a></li><li><a class="tocitem" href="#CPU-Parallelization"><span>CPU Parallelization</span></a></li><li><a class="tocitem" href="#GPU-Parallelization"><span>GPU Parallelization</span></a></li></ul></li><li><a class="tocitem" href="api/">API</a></li></ul><div class="docs-version-selector field has-addons"><div class="control"><span class="docs-label button is-static is-size-7">Version</span></div><div class="docs-selector control is-expanded"><div class="select is-fullwidth is-size-7"><select id="documenter-version-selector"></select></div></div></div></nav><div class="docs-main"><header class="docs-navbar"><nav class="breadcrumb"><ul class="is-hidden-mobile"><li class="is-active"><a href>Home</a></li></ul><ul class="is-hidden-tablet"><li class="is-active"><a href>Home</a></li></ul></nav><div class="docs-right"><a class="docs-edit-link" href="https://github.com/SteffenPL/SpatialHashTables.jl/blob/main/docs/src/index.md#" title="Edit on GitHub"><span class="docs-icon fab"></span><span class="docs-label is-hidden-touch">Edit on GitHub</span></a><a class="docs-settings-button fas fa-cog" id="documenter-settings-button" href="#" title="Settings"></a><a class="docs-sidebar-button fa fa-bars is-hidden-desktop" id="documenter-sidebar-button" href="#"></a></div></header><article class="content" id="documenter-page"><h1 id="SpatialHashTables"><a class="docs-heading-anchor" href="#SpatialHashTables">SpatialHashTables</a><a id="SpatialHashTables-1"></a><a class="docs-heading-anchor-permalink" href="#SpatialHashTables" title="Permalink"></a></h1><p>Documentation for <a href="https://github.com/SteffenPL/SpatialHashTables.jl">SpatialHashTables</a>.</p><h2 id="Core-interface"><a class="docs-heading-anchor" href="#Core-interface">Core interface</a><a id="Core-interface-1"></a><a class="docs-heading-anchor-permalink" href="#Core-interface" title="Permalink"></a></h2><p>There are essentially four functions which are needed to use the package:</p><p>The typical constructors have inputs which determine: </p><ul><li>the number of particles or the particles themselves</li><li>the spatial size of the cells</li><li>the number of hash indices (only for <code>SpatialHashTable</code>)</li><li>the domain (only for <code>BoundedHashTable</code>)</li></ul><p>The core functions are <code>BoundedHashTable</code> and <code>SpatialHashTable</code> which create the hash tables. The hash tables are then updated via <code>updatetable!</code> and once can iterate neigbours of a given position with the <code>neighbours</code> function.</p><h3 id="BoundedHashTable"><a class="docs-heading-anchor" href="#BoundedHashTable">BoundedHashTable</a><a id="BoundedHashTable-1"></a><a class="docs-heading-anchor-permalink" href="#BoundedHashTable" title="Permalink"></a></h3><p>The easiest constructor is <code>BoundedHashTable(X, r, domain)</code>, where <code>X</code> is a vector of particle positions, <code>r</code> is the spatial size of the cells, and <code>domain</code> is the upper bounde for the domain of the particles.</p><pre><code class="language-julia hljs">using StaticArrays, SpatialHashTables
+bht = BoundedHashTable(100, 0.1, (1.0, 2.0))</code></pre><p>To update the table for given positions, one can call <code>updatetable!</code>:</p><pre><code class="language-julia hljs">X = rand(SVector{Float64,3}, 100)
+updatetable!(bht, X)</code></pre><p>where <code>X</code> is a vector of particle positions. This is done in <span>$\mathcal{O}(n)$</span> time and allocation free.</p><p>Iteration over all neigbours of a given position <code>x</code> is done via <code>neighbours(bht, p, r)</code>:</p><pre><code class="language-julia hljs">p = @SVector [0.5, 0.5, 0.5]
+r = 0.2
+
+for j in neighbours(bht, p, r)
+    d² = sum(x -&gt; x^2, X[j] - p)
+
+    if d² &lt; r^2
+        # do something with X[j]
+    end
+end</code></pre><p>where <code>p</code> is a position and <code>r</code> is the cutoff distance. Notice that the cutoff distance  can be larger than the cell size during construction. In this case more cells will be visited during the iteration.</p><h3 id="SpatialHashTable"><a class="docs-heading-anchor" href="#SpatialHashTable">SpatialHashTable</a><a id="SpatialHashTable-1"></a><a class="docs-heading-anchor-permalink" href="#SpatialHashTable" title="Permalink"></a></h3><p>The constructor <code>SpatialHashTable(X, tablesize, r)</code> is similar to <code>BoundedHashTable</code>, but does not require a domain but instead the number of hash indices <code>tablesize</code>:</p><pre><code class="language-julia hljs">using StaticArrays, SpatialHashTables
+
+X = rand(SVector{Float64,3}, 1000)
+tablesize = 1000
+sht = SpatialHashTable(X, 0.1, tablesize)</code></pre><p>This creates a hash table with <code>tablesize</code> many hash indices. The number of hash indices should be chosen such that the number of particles per hash index is not too small. Due to the hashing, it can happen that  particles with large distance are assigned to the same hash index. This can be avoided by choosing a larger <code>tablesize</code>.</p><p>Too large <code>tablesize</code> can lead to a large memory footprint.</p><p>Moreover, by providing the positions <code>X</code> instead of the number of particles as the first input, the constructor will automatically call <code>updatetable!</code> to update the hash table.  The same holds for constructors of <code>BoundedHashTable</code>.</p><p>Using the hash table is similar to <code>BoundedHashTable</code>. Let us iterate here over all  pairs of points within a given radius <code>r</code>:</p><pre><code class="language-julia hljs">r = 0.05
+for i in eachindex(X)
+    for j in neighbours(sht, X[i], r)
+        d² = sum(x -&gt; x^2, X[i] - X[j])
+
+        if d² &lt; r^2
+            # do something with X[j]
+        end
+    end
+end</code></pre><h2 id="CPU-Parallelization"><a class="docs-heading-anchor" href="#CPU-Parallelization">CPU Parallelization</a><a id="CPU-Parallelization-1"></a><a class="docs-heading-anchor-permalink" href="#CPU-Parallelization" title="Permalink"></a></h2><p>The above code snippets are for serial CPU computations.  For parallel computations, one has to write small parallelization boilder code.  However, this approach provides in return flexibility and control.</p><p>Provided that <code>julia</code> is started with multiple threads, one can use <code>Threads.@threads</code> to parallelize the code:</p><pre><code class="language-julia hljs">res_mt = zeros(Threads.nthreads())
+
+Threads.@threads for i in eachindex(X)
+    for j in neighbours(sht, X[i], r)
+        d² = sum(x -&gt; x^2, X[i] - X[j])
+
+        if d² &lt; r^2
+            res_mt[Threads.threadid()] += sqrt(d²)
+        end
+    end
+end
+
+res = sum(res_mt)</code></pre><p>where <code>res_mt</code> is a vector of length <code>Threads.nthreads()</code> which stores the partial results of each thread. The final result is then the sum of the partial results.</p><p>This simple code snippet can be easily adapted to other computations. One example would be  to compute forces for all particles given a potential function <code>V</code>:</p><pre><code class="language-julia hljs">F = zeros(SVector{Float64,3}, length(X))
+
+Threads.@threads for i in eachindex(X)
+    for j in neighbours(sht, X[i], r)
+        d² = sum(x -&gt; x^2, X[i] - X[j])
+
+        if d² &lt; r^2
+            F[i] += (X[i] - X[j]) * V(d²)
+        end
+    end
+end</code></pre><p>Note that the code runs over all particles <code>i</code> and then over all neighbours <code>j</code> of <code>i</code>. For some computations one might add a check if <code>i == j</code> to avoid self-interactions or <code>i &lt; j</code> to avoid double counting.</p><h2 id="GPU-Parallelization"><a class="docs-heading-anchor" href="#GPU-Parallelization">GPU Parallelization</a><a id="GPU-Parallelization-1"></a><a class="docs-heading-anchor-permalink" href="#GPU-Parallelization" title="Permalink"></a></h2><p>The package is not fully optimized for GPUs.  However, here is a simple example how to use the package on GPUs via <code>CUDA.jl</code>:</p><pre><code class="language-julia hljs">using CUDA, StaticArrays, SpatialHashTables
+
+X = rand(CuArray{SVector{Float64,3}}, 1000)
+cellsize = 1/N^(1/3)
+
+ht = BoundedHashTable(X, cellsize, (1.0, 1.0, 1.0))
+
+r = 0.05
+
+X_gpu = cu(X)
+bht_gpu = cu(ht)
+
+function gpu_kernel!(ht_gpu, X, r, res)
+    index = (blockIdx().x - 1i32) * blockDim().x + threadIdx().x
+    stride = gridDim().x * blockDim().x
+
+    for i in index:stride:Int32(length(X))
+        res[i] = 0.0f0
+        for j in neighbours(ht_gpu, X[i], r)        
+            d2 = dist_sq(X[i], X[j])  
+            res[i] += ifelse(i &lt; j &amp;&amp; d2 &lt; r^2, 1.0f0, 0.0f0)
+        end
+    end
+    return nothing
+end
+
+res = CUDA.zeros(Float32, length(X))
+
+function compute_on_gpu(ht_gpu, X_gpu, r, res)
+
+    # determine number of threads and blocks
+    kernel = @cuda launch = false  gpu_kernel!(ht_gpu, X_gpu, r, res)
+    config = launch_configuration(kernel.fun)
+    threads = min(length(X_gpu), config.threads)
+    blocks = cld(length(X_gpu), threads)
+
+    # run kernel
+    CUDA.@sync begin 
+        kernel(ht_gpu, X_gpu, r, res; threads, blocks)
+    end
+
+    # reduce step
+    return sum(res)
+end</code></pre><p>At this point in thime, the performance of the GPU code is not better than of parallel CPU code.</p></article><nav class="docs-footer"><a class="docs-footer-nextpage" href="api/">API »</a><div class="flexbox-break"></div><p class="footer-message">Powered by <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> and the <a href="https://julialang.org/">Julia Programming Language</a>.</p></nav></div><div class="modal" id="documenter-settings"><div class="modal-background"></div><div class="modal-card"><header class="modal-card-head"><p class="modal-card-title">Settings</p><button class="delete"></button></header><section class="modal-card-body"><p><label class="label">Theme</label><div class="select"><select id="documenter-themepicker"><option value="documenter-light">documenter-light</option><option value="documenter-dark">documenter-dark</option></select></div></p><hr/><p>This document was generated with <a href="https://github.com/JuliaDocs/Documenter.jl">Documenter.jl</a> version 0.27.24 on <span class="colophon-date" title="Sunday 19 November 2023 03:10">Sunday 19 November 2023</span>. Using Julia version 1.9.4.</p></section><footer class="modal-card-foot"></footer></div></div></div></body></html>
