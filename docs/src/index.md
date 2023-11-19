@@ -117,13 +117,14 @@ This simple code snippet can be easily adapted to other computations. One exampl
 to compute forces for all particles given a potential function `V`:
 ```julia
 F = zeros(SVector{Float64,3}, length(X))
+V(d) = 1/d^3
 
 Threads.@threads for i in eachindex(X)
     for j in neighbours(sht, X[i], r)
         d² = sum(x -> x^2, X[i] - X[j])
 
         if d² < r^2
-            F[i] += (X[i] - X[j]) * V(d²)
+            F[i] += (X[i] - X[j]) * V(sqrt(d²))
         end
     end
 end
