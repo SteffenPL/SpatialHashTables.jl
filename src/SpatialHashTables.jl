@@ -103,13 +103,13 @@ from `zero(range)` to `range`. See details of the main constructor for more info
 BoundedHashTable(N::Int64, grid, range) = BoundedHashTable(N, grid, zero(range), range)
 
 """
-    BoundedHashTable(N::Int64, cellsize::Number, domainstart::SVector, domainend::SVector)
+    BoundedHashTable(N::Int64, cutoff::Number, domainstart::SVector, domainend::SVector)
 
-Constructs a `BoundedHashTable` with `N` particles, a cell size of `cellsize` and a domain
-from `domainstart` to `domainend`. The cell size is the same along each dimension.
+Constructs a `BoundedHashTable` with `N` particles. The cell size is close to `cutoff` (or slightly larger) 
+in each dimension. The domain ranges from `domainstart` to `domainend`.
 """
-function BoundedHashTable(N::Int64, cellsize::Number, domainstart::SVector, domainend::SVector)
-    grid = @. max(1, floor(Int64, (domainend - domainstart) / cellsize))
+function BoundedHashTable(N::Int64, cutoff::Number, domainstart::SVector, domainend::SVector)
+    grid = @. max(1, floor(Int64, (domainend - domainstart) / cutoff))
     return BoundedHashTable(N, tuple(grid...), domainstart, domainend)
 end
 
@@ -168,7 +168,7 @@ function SpatialHashTable(N::Int64, cellsize::SVector, tablesize::Int64; cachesi
 end
 
 """
-    SpatialHashTable(N::Integer, cellsize::Number, tablesize::Integer; args...)
+    SpatialHashTable(N::Integer, cellsize, tablesize::Integer; args...)
 
 Same as the main constructor, but allowing the cell size to be specified by a tuple of size `Dim`.
 """
