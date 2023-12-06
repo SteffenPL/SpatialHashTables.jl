@@ -61,9 +61,9 @@ function neighbouring_boxes(ht::AbstractSpatialHashTable, gridpos, r)
     IT = inttype(ht)
     Dim = IT(dimension(ht))
     widths = @. ceil(IT, r * ht.inv_cellsize)
-    int_offsets = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
-    offsets = (gridpos .+ Tuple(i) for i in int_offsets)
-    return (hashindex(ht, offset) for offset in offsets if insidegrid(ht, offset))
+    neighbour_indices = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
+    neighbour_reps = (gridpos .+ Tuple(i) for i in neighbour_indices)
+    return (hashindex(ht, rep) for rep in neighbour_reps if insidegrid(ht, rep))
 end
 
 """
@@ -76,9 +76,30 @@ This is the main method of this package and is used to find the neighbours of a 
 """
 function neighbours(ht::AbstractSpatialHashTable, pos, r)
     gridpos = gridindices(ht, pos)
-    return (k for boxhash in neighbouring_boxes(ht, gridpos, r) for k in iterate_box(ht, boxhash))
+    return (k   for boxhash in neighbouring_boxes(ht, gridpos, r) 
+                for k in iterate_box(ht, boxhash))
 end
 
+@inline function wrap_index(ht::BoundedHashTable, gridpos)
+    rep = @. mod(gridpos - 1, ht.gridsize) + 1
+    offset = @. ceil(Int64, (rep - gridpos) / ht.gridsize) * ht.domainsize
+    return (; rep, offset)
+end
+
+function periodic_neighbouring_boxes(ht::BoundedHashTable, gridpos, r)
+    IT = inttype(ht)
+    Dim = IT(dimension(ht))
+    widths = @. ceil(IT, r * ht.inv_cellsize)
+    neighbour_indices = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
+    neighbour_reps = (wrap_index(ht, gridpos .+ Tuple(i)) for i in neighbour_indices)
+    return ( (hashindex(ht, rep), offset) for (; rep, offset) in neighbour_reps)
+end
+
+function periodic_neighbours(ht::BoundedHashTable, pos, r)
+    gridpos = gridindices(ht, pos)
+    return ((k, offset) for (boxhash, offset) in periodic_neighbouring_boxes(ht, gridpos, r) 
+                for k in iterate_box(ht, boxhash))
+end
 
 # The following code deals with hash index collisions which could result 
 # in the same index being returned multiple times.

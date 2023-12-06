@@ -9,6 +9,7 @@ struct BoundedHashTable{Dim,VT<:AbstractVector,FT<:AbstractFloat,IT<:Integer} <:
 
     domainstart::SVector{Dim,FT}
     domainend::SVector{Dim,FT}
+    domainsize::SVector{Dim,FT}
 
     inv_cellsize::SVector{Dim,FT}
 
@@ -31,10 +32,11 @@ function BoundedHashTable(N::Integer, grid::Tuple, domainstart::SVector, domaine
     cellcount = Vector{typeof(N)}(undef, prod(grid) + 1)
     particlemap = Vector{typeof(N)}(undef, N)
 
-    inv_cellsize = grid ./ (domainend - domainstart)
+    domainsize = domainend - domainstart
+    inv_cellsize = grid ./ domainsize
     strides = (oneunit(eltype(grid)), cumprod(grid[1:end-1])...)
 
-    return BoundedHashTable(cellcount, particlemap, domainstart, domainend, inv_cellsize, strides, grid)
+    return BoundedHashTable(cellcount, particlemap, domainstart, domainend, domainsize, inv_cellsize, strides, grid)
 end
 
 

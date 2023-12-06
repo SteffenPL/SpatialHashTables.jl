@@ -1,6 +1,6 @@
 using SpatialHashTables
 using StaticArrays
-using Test
+using Test, LinearAlgebra
 
 using SpatialHashTables: hashindex, gridindices
 
@@ -69,4 +69,18 @@ end
     ht = SpatialHashTable(X, 0.1, 2)
 
     @test allunique(neighbours(ht, X[1], 0.1))
+end
+
+@testset "Periodic boundary" begin 
+    X = [SVec2(0.01,0.01), SVec2(0.99, 0.99)]
+    ht = BoundedHashTable(X, 0.1, [1.0, 1.0])
+    d = 0.0
+    for i in eachindex(X)
+        for (j, offset) in periodic_neighbours(ht, X[i], 0.1)
+            if i != j
+                d += norm(X[j] - offset - X[i])
+            end
+        end
+    end
+    @test d ≈ 2 * sqrt(2*0.02^2)
 end

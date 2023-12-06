@@ -9,5 +9,5 @@ include("core.jl")
 include("adapt.jl")
 
 export SpatialHashTable, BoundedHashTable, AbstractSpatialHashTable
-export updatetable!, resize!, neighbours, iterate_box, dimension, inside, hashposition
+export updatetable!, resize!, neighbours, iterate_box, dimension, inside, hashposition, periodic_neighbours
 end
