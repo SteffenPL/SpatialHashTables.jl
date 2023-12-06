@@ -83,7 +83,7 @@ end
 @inline function wrap_index(ht::BoundedHashTable, gridpos)
     rep = @. mod(gridpos - 1, ht.gridsize) + 1
     offset = @. ceil(Int64, (rep - gridpos) / ht.gridsize) * ht.domainsize
-    return (; rep, offset)
+    return (rep = rep, offset = offset)
 end
 
 function periodic_neighbouring_boxes(ht::BoundedHashTable, gridpos, r)
@@ -92,7 +92,7 @@ function periodic_neighbouring_boxes(ht::BoundedHashTable, gridpos, r)
     widths = @. ceil(IT, r * ht.inv_cellsize)
     neighbour_indices = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
     neighbour_reps = (wrap_index(ht, gridpos .+ Tuple(i)) for i in neighbour_indices)
-    return ( (hashindex(ht, rep), offset) for (; rep, offset) in neighbour_reps)
+    return ( (hashindex(ht, rep), offset) for (rep, offset) in neighbour_reps)
 end
 
 function periodic_neighbours(ht::BoundedHashTable, pos, r)
