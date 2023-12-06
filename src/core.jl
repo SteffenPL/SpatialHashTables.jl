@@ -95,6 +95,30 @@ function periodic_neighbouring_boxes(ht::BoundedHashTable, gridpos, r)
     return ( (hashindex(ht, rep), offset) for (rep, offset) in neighbour_reps)
 end
 
+"""
+periodic_neighbours(ht::BoundedHashTable, pos, r)
+
+Returns an iterator over the particles in the neighbourhood of `pos` in the hash table `ht`
+together with the offset which is might needed to wrap the particle back into the domain.
+The argument `r` determines the radius of the neighbourhood.
+
+The offset is the vector such that `X[j] + offset` is close to `pos`. 
+Consider the following example:
+```julia 
+using LinearAlgebra
+
+X = [SVec2(0.01,0.01), SVec2(0.99, 0.99)]
+ht = BoundedHashTable(X, 0.01, [1.0, 1.0])
+
+for i in 1:2
+    Xi = X[i]
+    for (j, offset) in periodic_neighbours(ht, X[i], 0.1)
+        Xj = X[j] + offset
+        d = norm(Xi - Xj)
+    end
+end
+```
+"""
 function periodic_neighbours(ht::BoundedHashTable, pos, r)
     gridpos = gridindices(ht, pos)
     return ((k, offset) for (boxhash, offset) in periodic_neighbouring_boxes(ht, gridpos, r) 
