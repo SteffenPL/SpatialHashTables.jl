@@ -1,7 +1,7 @@
 name = "SpatialHashTables"
 uuid = "894afd4e-5c6f-4d1a-a294-873acbd0e95c"
 authors = ["Steffen Plunder <steffen.plunder@web.de> and contributors"]
-version = "0.2.0"
+version = "0.2.1"
 
 [deps]
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
