@@ -84,3 +84,18 @@ end
     end
     @test d ≈ 2 * sqrt(2*0.02^2)
 end
+
+
+@testset "Periodic boundary" begin 
+    X = [SVec2(0.1, 0.5), SVec2(0.9, 0.5)]
+    ht = BoundedHashTable(X, 0.01, [1.0, 1.0])
+    d = 0.0
+    for i in eachindex(X)
+        for (j, offset) in periodic_neighbours(ht, X[i], 0.25)
+            if i != j
+                d += norm(X[j] - offset - X[i])
+            end
+        end
+    end
+    @test d ≈ 2 * norm(X[2] - X[1] - [1.0, 0.0])
+end
