@@ -57,13 +57,13 @@ Returns an iterator over the neighbouring boxes of the box with grid position `g
 The `gridpos` is a tuple of size `Dim` which determines the position of a box in lattice 
 with basis vectors `ht.inv_cellsize`.
 """
-function neighbouring_boxes(ht::AbstractSpatialHashTable, gridpos, r)
-    IT = inttype(ht)
-    Dim = IT(dimension(ht))
-    widths = @. ceil(IT, r * ht.inv_cellsize)
-    neighbour_indices = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
-    neighbour_reps = (gridpos .+ Tuple(i) for i in neighbour_indices)
+function neighbouring_boxes(ht::AbstractSpatialHashTable, gridpos, neighbour_reps)
     return (hashindex(ht, rep) for rep in neighbour_reps if insidegrid(ht, rep))
+end
+
+function iterator(ht, gridpos, neighbour_reps)
+    return (k   for boxhash in neighbouring_boxes(ht, gridpos, neighbour_reps) 
+                for k in iterate_box(ht, boxhash))
 end
 
 """
@@ -76,8 +76,10 @@ This is the main method of this package and is used to find the neighbours of a 
 """
 function neighbours(ht::AbstractSpatialHashTable, pos, r)
     gridpos = gridindices(ht, pos)
-    return (k   for boxhash in neighbouring_boxes(ht, gridpos, r) 
-                for k in iterate_box(ht, boxhash))
+    neighbour_indices = CartesianIndices( (-1:1, -1:1, -1:1) ) #ntuple(i -> -widths[i]:widths[i], Dim))
+    neighbour_reps = (gridpos .+ Tuple(i) for i in neighbour_indices)
+
+    return iterator(ht, gridpos, neighbour_reps)
 end
 
 @inline function wrap_index(ht::BoundedHashTable, gridpos)
@@ -142,5 +144,12 @@ function neighbours(ht::SpatialHashTable, pos, r)
     gridpos = gridindices(ht, pos)
     seen = thread_cache(ht)
     empty!(seen)
-    return (k for boxhash in neighbouring_boxes(ht, gridpos, r) for k in iterate_box_if(ht, boxhash, seen))
+
+    IT = inttype(ht)
+    Dim = IT(dimension(ht))
+    widths = @. ceil(IT, r * ht.inv_cellsize)
+    neighbour_indices = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Val(Dim)))
+    neighbour_reps = (gridpos .+ Tuple(i) for i in neighbour_indices)
+
+    return (k for boxhash in neighbouring_boxes(ht, gridpos, neighbour_reps) for k in iterate_box_if(ht, boxhash, seen))
 end
