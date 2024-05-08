@@ -1,18 +1,13 @@
-"""
-    Adapt.adapt_structure(to, ht::AbstractSpatialHashTable)
-
-Adapts the hash table `ht` to the type `to`. This is useful for GPU support.
-
-It automatically converts types to `Float64` and `Int32`!
-"""
-function adapt_structure(to, bht::BoundedHashTable)
-    cellcount = adapt_structure(to, Int32.(bht.cellcount))
-    particlemap = adapt_structure(to, Int32.(bht.particlemap))
-    return BoundedHashTable(cellcount,
-        particlemap,
-        Float32.(bht.domainstart),
-        Float32.(bht.domainend),
-        Float32.(bht.inv_cellsize),
-        Int32.(bht.strides),
-        Int32.(bht.gridsize))
+function adapt_structure(to, grid::HashGrid) 
+    HashGrid(
+        grid.cellwidth,
+        grid.cellwidthinv,
+        grid.gridsize,
+        grid.origin,
+        adapt_structure(to, grid.cellidx),
+        adapt_structure(to, grid.pointidx),
+        adapt_structure(to, grid.cellstarts),
+        adapt_structure(to, grid.cellends), 
+        grid.backend,
+        grid.nthreads)
 end

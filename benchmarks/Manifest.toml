@@ -695,10 +695,10 @@ uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
 version = "1.10.0"
 
 [[deps.SpatialHashTables]]
-deps = ["Adapt", "StaticArrays"]
+deps = ["Adapt", "KernelAbstractions", "StaticArrays"]
 path = ".."
 uuid = "894afd4e-5c6f-4d1a-a294-873acbd0e95c"
-version = "0.2.1"
+version = "0.3.0"
 
 [[deps.SplittablesBase]]
 deps = ["Setfield", "Test"]

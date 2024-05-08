@@ -8,68 +8,9 @@ using LinearAlgebra, StaticArrays
 using ThreadsX
 
 
-
-
-@kernel function compute_cell_indices_kernel!(hg, X)
-    tid = @index(Global)
-    hg.pointcellidx[tid] = pos2hash(hg, X[tid])
-    hg.pointidx[tid] = tid 
-end
-
-function compute_cell_indices!(hg, X, nthreads = hg.nthreads)
-    compute_cell_indices_kernel!(hg.backend, unval(nthreads))(hg, X, ndrange = length(X))
-end
-
-@kernel function compute_cell_offsets_kernel!(hg)
-    tid = @index(Global)
-
-    c = hg.pointcellidx[tid]
-    if tid == 1
-        hg.cellstarts[c] = 1
-    else
-        p = hg.pointcellidx[tid-1]
-        if c != p
-            hg.cellstarts[c] = tid 
-            hg.cellends[p] = tid-1
-        end
-    end
-
-    if tid == length(hg.pointidx)
-        hg.cellends[c] = length(hg.pointidx)
-    end
-end
-
-function compute_cell_offsets!(hg, nthreads = hg.nthreads)
-    compute_cell_offsets_kernel!(hg.backend, unval(nthreads))(hg, ndrange = length(hg.pointcellidx))
-end
-
-
-function paired_sort!(ix, a, backend, nthreads)
-    if backend isa CUDABackend
-        CUDA.sortperm!(ix, a)
-        CUDA.permute!(ix, a)
-    elseif backend isa CPU && unval(nthreads) > 1
-        sortperm!(ix, a, alg = ThreadsX.QuickSort)
-        permute!(ix, a)
-    else
-        sortperm!(ix, a)
-        permute!(ix, a)
-    end
-end
-
-function updatecells!(hg, X, nthreads = hg.nthreads)    
-    compute_cell_indices!(hg, X, nthreads)
-    paired_sort!(hg.pointidx, hg.pointcellidx, hg.backend, nthreads)
-    compute_cell_offsets!(hg, nthreads)
-    KernelAbstractions.synchronize(hg.backend)
-end
-
-
-
-cu 
 SVec3 = SVector{3,Float32}
-
 X_cpu, _ = CellListMap.xatomic(10^6)
+X = cu(convert.(SVec3,X_cpu))
 
 # cell list map 
 lim = limits(X_cpu)
@@ -77,24 +18,19 @@ box = Box(lim, 12.0)
 cl = CellList(X_cpu, box)
 r = box.cutoff
 
-#X_cpu = rand(SVec3, 10^6)
-X = cu(convert.(SVec3,X_cpu))
+gridsize = Tuple(box.nc)
+cellwidth = box.cell_size
 
+hg = HashGrid{CuVector{Int32}}(X, Float32.(cellwidth), Int32.(gridsize); nthreads = 1024)
+hg_cpu = HashGrid(X_cpu, cellwidth, gridsize)
 
-hg = HashGrid(CuArray{Int32}, X, Float32.(box.cell_size), box.nc)
-hg_cpu = HashGrid(Vector{Int64}, X_cpu, box.cell_size, box.nc)
-
-@time updatecells!(hg, X)
+@time updatecells!(hg, X; modul = CUDA)
 @time updatecells!(hg_cpu, X_cpu)
 
 # system = InPlaceNeighborList(x=X_cpu, cutoff = box.cutoff, unitcell = lim.limits)
 # @time update!(system, X_cpu)
 
 # @profview updatecells!(hg_cpu, X_cpu)
-
-function cellcontent(hg, cellind)
-
-end
 
 struct HashGridQuery{CIndsT <: CartesianIndices, HG <: HashGrid}
     cellindices::CIndsT

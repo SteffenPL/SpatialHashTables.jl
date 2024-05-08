@@ -1,13 +1,17 @@
 module SpatialHashTables
+
 using StaticArrays
+using KernelAbstractions
 import Adapt: adapt_structure
 
-include("abstractspatialhashtables.jl")
-include("boundedhashtable.jl")
-include("spatialhashtable.jl")
+# elementary definitions
+unval(::Val{x}) where {x} = x
+unval(x) = x
+
 include("core.jl")
 include("adapt.jl")
 
-export SpatialHashTable, BoundedHashTable, AbstractSpatialHashTable
-export updatetable!, resize!, neighbours, iterate_box, dimension, inside, hashposition, periodic_neighbours
+export HashGrid, HashGridQuery
+export updatecells!, neighbours
+
 end

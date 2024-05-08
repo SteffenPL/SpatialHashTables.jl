@@ -1,155 +1,193 @@
+struct HashGrid{Dim, FltT<:Real, IntVecT, IntT, BackendT, NThreads} 
+    
+    cellwidth::SVector{Dim,FltT}
+    cellwidthinv::SVector{Dim,FltT}
 
-"""
-    updatetable!(ht::AbstractSpatialHashTable, X)
+    gridsize::NTuple{Dim,IntT} 
+    
+    origin::SVector{Dim,FltT}
 
-Updates the hash table `ht` with the positions `X` of the particles.
+    cellidx::IntVecT 
+    pointidx::IntVecT
 
-This method is linear in the number of particles and should generally not allocate.
+    cellstarts::IntVecT
+    cellends::IntVecT 
 
-The ideal datatype for `X` is `Vector{SVector{Dim,FT}}` where `Dim` is the spatial dimension
-and `FT` is the floating point type.	
-"""
-function updatetable!(ht::AbstractSpatialHashTable, X)
-    ht.cellcount .= 0
-    for i in eachindex(X)
-        ht.cellcount[hashposition(ht, X[i])] += 1
-    end
-    cumsum!(ht.cellcount, ht.cellcount)
-
-    for i in eachindex(X)
-        box = hashposition(ht, X[i])
-        ht.particlemap[ht.cellcount[box]] = i
-        ht.cellcount[box] -= 1
-    end
+    backend::BackendT
+    nthreads::NThreads
 end
 
-"""
-    resize!(ht::AbstractSpatialHashTable, n_positions)
+# basic information
 
-Resizes the hash table `ht` to accomodate `n_positions` particles. This method is useful
-if the number of particles changes over time. 
+dimension(hg::HashGrid) = length(hg.cellwidth)
+floattype(hg::HashGrid) = eltype(hg.cellwidth)
+inttype(hg::HashGrid) = eltype(hg.gridsize)
+linearindices(hg::HashGrid) = LinearIndices(hg.gridsize)
+cartesianindices(hg::HashGrid) = CartesianIndices(hg.gridsize)
 
-This call should usually be followed by a call to `updatetable!` to update the hash table.
-Without `updatetable!` the hash table will be in an inconsistent state.
-"""
-function Base.resize!(ht::AbstractSpatialHashTable, n_positions)
-    resize!(ht.particlemap, n_positions)
+# access cells 
+
+cell(hg::HashGrid, i) = (hg.pointidx[k] for k in hg.cellstarts[i]:hg.cellends[i])
+cellpos(hg::HashGrid, i) = hg.origin + hg.cellwidth .* cartesianindices(hg)[i]
+
+# constructors
+
+function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend) where {IndexVecT}
+    Dim = length(gridsize)
+    FltT = eltype(origin)
+
+    cellwidth = SVector(ntuple(i -> get(radius, i, radius[end]), Dim))
+    cellwidthinv = one(FltT) ./ cellwidth
+
+    cellidx  = IndexVecT(undef, npts)
+    pointidx = IndexVecT(undef, npts)
+
+    ncells = prod(gridsize)
+    cellstarts = IndexVecT(undef, ncells)
+    cellends   = IndexVecT(undef, ncells)
+
+    return HashGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, backend, Val(nthreads))
 end
 
-
-"""
-    iterate_box(ht::AbstractSpatialHashTable, boxhash)
-
-Returns an iterator over the particles in the box with hash `boxhash` in the hash table `ht`.
-"""
-function iterate_box(ht::AbstractSpatialHashTable, boxhash)
-    box_start = ht.cellcount[boxhash] + oneunit(inttype(ht))
-    box_end = ht.cellcount[boxhash+1]
-    return (ht.particlemap[k] for k in box_start:box_end)
+function HashGrid{IndexVecType}(pts, radius, gridsize;
+                    origin = zero(eltype(pts)), 
+                    nthreads = eltype(IndexVecType) == Int32 ? 256 : Threads.nthreads()) where {IndexVecType}
+    
+    npts = length(pts)
+    backend = get_backend(pts)
+    return HashGrid{IndexVecType}(radius, gridsize, origin, npts, nthreads, backend)
 end
 
-"""
-    neighbouring_boxes(ht::AbstractSpatialHashTable, gridpos, r)
+HashGrid(pts::Vector{SVector{Dim,Float64}}, args...; kwargs...) where {Dim} = HashGrid{Vector{Int64}}(pts, args...; kwargs...)
 
-Returns an iterator over the neighbouring boxes of the box with grid position `gridpos` in the hash table `ht`.
-`r` determines the radius of the neighbourhood.
 
-The `gridpos` is a tuple of size `Dim` which determines the position of a box in lattice 
-with basis vectors `ht.inv_cellsize`.
-"""
-function neighbouring_boxes(ht::AbstractSpatialHashTable, gridpos, neighbour_reps)
-    return (hashindex(ht, rep) for rep in neighbour_reps if insidegrid(ht, rep))
+# index functions
+# - pos  (position, vector)
+# - grid (gridindex, cartesian) 
+# - hash (cellindex, linear)
+
+@inline function pos2grid(grid, pos)
+    IntT = inttype(grid)
+    return @. mod1(ceil(IntT, (pos - grid.origin) * grid.cellwidthinv), grid.gridsize)
 end
 
-function iterator(ht, gridpos, neighbour_reps)
-    return (k   for boxhash in neighbouring_boxes(ht, gridpos, neighbour_reps) 
-                for k in iterate_box(ht, boxhash))
+@inline grid2hash(grid, ind) = linearindices(grid)[ind...]
+@inline pos2hash(grid, pos) = grid2hash(grid, pos2grid(grid, pos))
+
+
+# update functions
+
+@kernel function compute_cell_hashes_kernel!(hg, pts)
+    tid = @index(Global)
+    hg.cellidx[tid] = pos2hash(hg, pts[tid])
+    hg.pointidx[tid] = tid 
 end
 
-"""
-    neighbours(ht::AbstractSpatialHashTable, pos, r)
-
-Returns an iterator over the particles in the neighbourhood of `pos` in the hash table `ht`.
-`r` determines the radius of the neighbourhood.
-
-This is the main method of this package and is used to find the neighbours of a particle.
-"""
-function neighbours(ht::AbstractSpatialHashTable, pos, r)
-    gridpos = gridindices(ht, pos)
-    neighbour_indices = CartesianIndices( (-1:1, -1:1, -1:1) ) #ntuple(i -> -widths[i]:widths[i], Dim))
-    neighbour_reps = (gridpos .+ Tuple(i) for i in neighbour_indices)
-
-    return iterator(ht, gridpos, neighbour_reps)
+function compute_cell_hashes!(hg, pts, nthreads = hg.nthreads)
+    compute_cell_hashes_kernel!(hg.backend, unval(nthreads))(hg, pts, ndrange = length(pts))
 end
 
-@inline function wrap_index(ht::BoundedHashTable, gridpos)
-    rep = @. mod(gridpos - 1, ht.gridsize) + 1
-    offset = @. ceil(Int64, (rep - gridpos) / ht.gridsize) * ht.domainsize
-    return (rep = rep, offset = offset)
-end
+@kernel function compute_cell_offsets_kernel!(hg)
+    tid = @index(Global)
 
-function periodic_neighbouring_boxes(ht::BoundedHashTable, gridpos, r)
-    IT = inttype(ht)
-    Dim = IT(dimension(ht))
-    widths = @. ceil(IT, r * ht.inv_cellsize)
-    neighbour_indices = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Dim))
-    neighbour_reps = (wrap_index(ht, gridpos .+ Tuple(i)) for i in neighbour_indices)
-    return ( (hashindex(ht, rep), offset) for (rep, offset) in neighbour_reps)
-end
-
-"""
-periodic_neighbours(ht::BoundedHashTable, pos, r)
-
-Returns an iterator over the particles in the neighbourhood of `pos` in the hash table `ht`
-together with the offset which is might needed to wrap the particle back into the domain.
-The argument `r` determines the radius of the neighbourhood.
-
-The offset is the vector such that `X[j] + offset` is close to `pos`. 
-Consider the following example:
-```julia 
-using LinearAlgebra
-
-X = [SVec2(0.01,0.01), SVec2(0.99, 0.99)]
-ht = BoundedHashTable(X, 0.01, [1.0, 1.0])
-
-for i in 1:2
-    Xi = X[i]
-    for (j, offset) in periodic_neighbours(ht, X[i], 0.1)
-        Xj = X[j] + offset
-        d = norm(Xi - Xj)
-    end
-end
-```
-"""
-function periodic_neighbours(ht::BoundedHashTable, pos, r)
-    gridpos = gridindices(ht, pos)
-    return ((k, offset) for (boxhash, offset) in periodic_neighbouring_boxes(ht, gridpos, r) 
-                for k in iterate_box(ht, boxhash))
-end
-
-# The following code deals with hash index collisions which could result 
-# in the same index being returned multiple times.
-thread_cache(ht::SpatialHashTable) = ht.caches[Threads.threadid()]
-
-function iterate_box_if(ht, boxhash, seen)
-    if boxhash in seen
-        return iterate_box(ht, ht.tablesize + 1)  # this box is empty (see constructor where we add +2)
+    c = hg.cellidx[tid]
+    if tid == 1
+        hg.cellstarts[c] = 1
     else
-        push!(seen, boxhash)
-        return iterate_box(ht, boxhash)
+        p = hg.cellidx[tid-1]
+        if c != p
+            hg.cellstarts[c] = tid 
+            hg.cellends[p] = tid-1
+        end
+    end
+
+    if tid == length(hg.pointidx)
+        hg.cellends[c] = length(hg.pointidx)
     end
 end
 
-function neighbours(ht::SpatialHashTable, pos, r)
-    gridpos = gridindices(ht, pos)
-    seen = thread_cache(ht)
-    empty!(seen)
+function compute_cell_offsets!(hg, nthreads = hg.nthreads)
+    compute_cell_offsets_kernel!(hg.backend, unval(nthreads))(hg, ndrange = length(hg.cellidx))
+end
 
-    IT = inttype(ht)
-    Dim = IT(dimension(ht))
-    widths = @. ceil(IT, r * ht.inv_cellsize)
-    neighbour_indices = CartesianIndices(ntuple(i -> -widths[i]:widths[i], Val(Dim)))
-    neighbour_reps = (gridpos .+ Tuple(i) for i in neighbour_indices)
+function paired_sort!(ix, a, modul, alg)
+    if isnothing(alg) && (!isnothing(modul) || a isa Vector)
+        getproperty(modul, :sortperm!)(ix, a)
+        getproperty(modul, :permute!)(ix, a)
+    elseif !isnothing(alg)
+        getproperty(modul, :sortperm!)(ix, a; alg)
+        getproperty(modul, :permute!)(ix, a)
+    else 
+        error("""Please select a proper module and sorting algorithm for the vector type $(typeof(a))
+        For example via `updatecells!(grid, pts; module = CUDA)`.
+        """)
+    end
+end
 
-    return (k for boxhash in neighbouring_boxes(ht, gridpos, neighbour_reps) for k in iterate_box_if(ht, boxhash, seen))
+function updatecells!(hg, pts; modul = Base, alg = nothing, nthreads = hg.nthreads)    
+
+    resize!(hg.cellidx, length(pts))
+    resize!(hg.pointidx, length(pts))
+
+    compute_cell_hashes!(hg, pts, nthreads)
+    paired_sort!(hg.pointidx, hg.cellidx, modul, alg)
+    compute_cell_offsets!(hg, nthreads)
+
+    # after this operation, pointidx[i] is a point index and cellidx[i] is the cell index containing the point 
+    # cellstarts and cellends defines the range of a cell inside 'pointidx' 
+
+    KernelAbstractions.synchronize(hg.backend)
+end
+
+
+
+# iteration over neighbours 
+
+struct HashGridQuery{HG <: HashGrid, CIndsT <: CartesianIndices}
+    grid::HG
+    cellindices::CIndsT
+end
+
+function HashGridQuery(hg::HashGrid, pos, r)
+    starts =      pos2index(hg, pos .- r)
+    ends   = min.(pos2index(hg, pos .+ r), @. starts + hg.gridsize - 1)
+    cellindices = CartesianIndices( ntuple( i -> starts[i]:ends[i], Dim(hg)))
+
+    return HashGridQuery(cellindices, hg)
+end
+
+neighbours(hg, pos, r) = HashGridQuery(hg, pos, r)
+
+
+function Base.iterate(query::HashGridQuery)
+    cellind = first(query.cellindices)
+    linearidx = LinearIndices(query.grid.gridsize)[cellind]
+    i       = query.grid.cellstarts[linearidx]
+    cellend = query.grid.cellends[linearidx]
+
+    initstate = (cellind, i-1, cellend)
+
+    return iterate(query, initstate)
+end
+
+function Base.iterate(query::HashGridQuery, state)
+    (cellind, i, cellend) = state
+
+    while true
+        if i <= cellend
+            k = query.grid.pointidx[i]
+            return (k, (cellind, i+1, cellend))
+        else
+            next = iterate(query.cellindices, cellind)
+
+            if isnothing(next)
+                return nothing 
+            end
+
+            cellind = next[1]
+            linearidx = LinearIndices(query.grid.gridsize)[cellind]
+            i       = query.grid.cellstarts[linearidx]
+            cellend = query.grid.cellends[linearidx]
+        end
+    end
 end
