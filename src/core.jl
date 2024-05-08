@@ -19,20 +19,27 @@ end
 
 # basic information
 
-dimension(hg::HashGrid) = length(hg.cellwidth)
-floattype(hg::HashGrid) = eltype(hg.cellwidth)
+dimension(hg::HashGrid) = length(hg.gridsize)
 inttype(hg::HashGrid) = eltype(hg.gridsize)
 linearindices(hg::HashGrid) = LinearIndices(hg.gridsize)
 cartesianindices(hg::HashGrid) = CartesianIndices(hg.gridsize)
+floattype(hg::HashGrid) = eltype(hg.cellwidth)
 
 # access cells 
 
-cell(hg::HashGrid, i) = (hg.pointidx[k] for k in hg.cellstarts[i]:hg.cellends[i])
-cellpos(hg::HashGrid, i) = hg.origin + hg.cellwidth .* cartesianindices(hg)[i]
+function cell(hg::HashGrid, i) 
+    k = linearindices(hg)[i]
+    return view(hg.pointidx, hg.cellstarts[k]:hg.cellends[k])
+end
+
+function celldomain(hg::HashGrid, i)
+    gridind = Tuple(cartesianindices(hg)[i])
+    return (hg.origin + hg.cellwidth .* (gridind .- 1), hg.origin + hg.cellwidth .* gridind)
+end 
 
 # constructors
 
-function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend) where {IndexVecT}
+function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend = KernelAbstractions.CPU()) where {IndexVecT}
     Dim = length(gridsize)
     FltT = eltype(origin)
 
@@ -49,16 +56,21 @@ function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend) 
     return HashGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, backend, Val(nthreads))
 end
 
-function HashGrid{IndexVecType}(pts, radius, gridsize;
+function HashGrid{IndexVecType}(pts, cellwidth, gridsize;
                     origin = zero(eltype(pts)), 
                     nthreads = eltype(IndexVecType) == Int32 ? 256 : Threads.nthreads()) where {IndexVecType}
     
     npts = length(pts)
     backend = get_backend(pts)
-    return HashGrid{IndexVecType}(radius, gridsize, origin, npts, nthreads, backend)
+    return HashGrid{IndexVecType}(cellwidth, gridsize, origin, npts, nthreads, backend)
 end
 
 HashGrid(pts::Vector{SVector{Dim,Float64}}, args...; kwargs...) where {Dim} = HashGrid{Vector{Int64}}(pts, args...; kwargs...)
+
+function HashGrid{IndexVecType}(pts, domainstart, domainend, gridsize; kwargs...) where {IndexVecType}
+    cellwidth = (domainend .- domainstart) ./ gridsize
+    return HashGrid{IndexVecType}(pts, cellwidth, gridsize; kwargs..., origin = domainstart)
+end
 
 
 # index functions
@@ -66,12 +78,19 @@ HashGrid(pts::Vector{SVector{Dim,Float64}}, args...; kwargs...) where {Dim} = Ha
 # - grid (gridindex, cartesian) 
 # - hash (cellindex, linear)
 
-@inline function pos2grid(grid, pos)
+@inline function pos2grid(grid, pos, correction = :mod)
     IntT = inttype(grid)
-    return @. mod1(ceil(IntT, (pos - grid.origin) * grid.cellwidthinv), grid.gridsize)
+
+    ind = Tuple(@. ceil(IntT, (pos - grid.origin) * grid.cellwidthinv))
+
+    if correction == :mod
+        ind = mod1.(ind, grid.gridsize)
+    end
+
+    return CartesianIndex(ind)
 end
 
-@inline grid2hash(grid, ind) = linearindices(grid)[ind...]
+@inline grid2hash(grid, ind) = linearindices(grid)[ind]
 @inline pos2hash(grid, pos) = grid2hash(grid, pos2grid(grid, pos))
 
 
@@ -113,10 +132,10 @@ end
 function paired_sort!(ix, a, modul, alg)
     if isnothing(alg) && (!isnothing(modul) || a isa Vector)
         getproperty(modul, :sortperm!)(ix, a)
-        getproperty(modul, :permute!)(ix, a)
+        getproperty(modul, :permute!)(a, ix)
     elseif !isnothing(alg)
         getproperty(modul, :sortperm!)(ix, a; alg)
-        getproperty(modul, :permute!)(ix, a)
+        getproperty(modul, :permute!)(a, ix)
     else 
         error("""Please select a proper module and sorting algorithm for the vector type $(typeof(a))
         For example via `updatecells!(grid, pts; module = CUDA)`.
@@ -128,6 +147,9 @@ function updatecells!(hg, pts; modul = Base, alg = nothing, nthreads = hg.nthrea
 
     resize!(hg.cellidx, length(pts))
     resize!(hg.pointidx, length(pts))
+
+    fill!(hg.cellstarts, one(inttype(hg)))
+    fill!(hg.cellends,  zero(inttype(hg)))
 
     compute_cell_hashes!(hg, pts, nthreads)
     paired_sort!(hg.pointidx, hg.cellidx, modul, alg)
@@ -147,25 +169,26 @@ struct HashGridQuery{HG <: HashGrid, CIndsT <: CartesianIndices}
     grid::HG
     cellindices::CIndsT
 end
+Base.IteratorSize(::HashGridQuery) = Base.SizeUnknown()
+Base.eltype(query::HashGridQuery) = eltype(query.grid.pointidx) 
 
 function HashGridQuery(hg::HashGrid, pos, r)
-    starts =      pos2index(hg, pos .- r)
-    ends   = min.(pos2index(hg, pos .+ r), @. starts + hg.gridsize - 1)
-    cellindices = CartesianIndices( ntuple( i -> starts[i]:ends[i], Dim(hg)))
-
-    return HashGridQuery(cellindices, hg)
+    starts =     pos2grid(hg, pos .- r, :unbound)
+    ends   = min(pos2grid(hg, pos .+ r, :unbound), CartesianIndex(Tuple(starts) .+ hg.gridsize .- 1))
+    cellindices = starts:ends
+    
+    return HashGridQuery(hg, cellindices)
 end
 
-neighbours(hg, pos, r) = HashGridQuery(hg, pos, r)
-
+warpindex(hg, ind) = CartesianIndex( mod1.(Tuple(ind), hg.gridsize)... )
 
 function Base.iterate(query::HashGridQuery)
     cellind = first(query.cellindices)
-    linearidx = LinearIndices(query.grid.gridsize)[cellind]
+    linearidx = LinearIndices(query.grid.gridsize)[warpindex(query.grid, cellind)]
     i       = query.grid.cellstarts[linearidx]
     cellend = query.grid.cellends[linearidx]
 
-    initstate = (cellind, i-1, cellend)
+    initstate = (cellind, i, cellend)
 
     return iterate(query, initstate)
 end
@@ -185,7 +208,7 @@ function Base.iterate(query::HashGridQuery, state)
             end
 
             cellind = next[1]
-            linearidx = LinearIndices(query.grid.gridsize)[cellind]
+            linearidx = LinearIndices(query.grid.gridsize)[warpindex(query.grid, cellind)]
             i       = query.grid.cellstarts[linearidx]
             cellend = query.grid.cellends[linearidx]
         end

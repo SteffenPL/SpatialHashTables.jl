@@ -1,85 +1,33 @@
 using Revise 
+using LinearAlgebra, StaticArrays
 
 using CellListMap
 using SpatialHashTables
-using ProtoStructs
-using CUDA, KernelAbstractions
-using LinearAlgebra, StaticArrays
-using ThreadsX
+using CUDA, ThreadsX
 
+using SpatialHashTables: cell, cellpos
 
 SVec3 = SVector{3,Float32}
-X_cpu, _ = CellListMap.xatomic(10^6)
+X_cpu, _ = CellListMap.xatomic(10^4)
 X = cu(convert.(SVec3,X_cpu))
 
 # cell list map 
 lim = limits(X_cpu)
-box = Box(lim, 12.0)
+box = Box(lim, 50.0)
 cl = CellList(X_cpu, box)
 r = box.cutoff
 
 gridsize = Tuple(box.nc)
 cellwidth = box.cell_size
 
+cellwidth = 25.0
+gridsize = (2, 2, 2)
+
 hg = HashGrid{CuVector{Int32}}(X, Float32.(cellwidth), Int32.(gridsize); nthreads = 1024)
 hg_cpu = HashGrid(X_cpu, cellwidth, gridsize)
 
 @time updatecells!(hg, X; modul = CUDA)
 @time updatecells!(hg_cpu, X_cpu)
-
-# system = InPlaceNeighborList(x=X_cpu, cutoff = box.cutoff, unitcell = lim.limits)
-# @time update!(system, X_cpu)
-
-# @profview updatecells!(hg_cpu, X_cpu)
-
-struct HashGridQuery{CIndsT <: CartesianIndices, HG <: HashGrid}
-    cellindices::CIndsT
-    grid::HG
-end
-
-function neighbours(hg, pos, r)
-    starts =      pos2index(hg, pos .- r)
-    ends   = min.(pos2index(hg, pos .+ r), @. starts + hg.gridsize - 1)
-    cellindices = CartesianIndices( ntuple( i -> starts[i]:ends[i], Dim(hg)))
-
-    return HashGridQuery(cellindices, hg)
-end
-
-function Base.iterate(query::HashGridQuery)
-    cellind = first(query.cellindices)
-    linearidx = LinearIndices(query.grid.gridsize)[cellind]
-    i       = query.grid.cellstarts[linearidx]
-    cellend = query.grid.cellends[linearidx]
-
-    initstate = (cellind, i-1, cellend)
-
-    return iterate(query, initstate)
-end
-
-function Base.iterate(query::HashGridQuery, state)
-    (cellind, i, cellend) = state
-
-    while true
-        if i <= cellend
-            k = query.grid.pointidx[i]
-            return (k, (cellind, i+1, cellend))
-        else
-            next = iterate(query.cellindices, cellind)
-
-            if isnothing(next)
-                return nothing 
-            end
-
-            cellind = next[1]
-            linearidx = LinearIndices(query.grid.gridsize)[cellind]
-            i       = query.grid.cellstarts[linearidx]
-            cellend = query.grid.cellends[linearidx]
-        end
-    end
-end
-
-
-
 
 @kernel function compute_energy(forces, X, hg)
     tid = @index(Global) 
