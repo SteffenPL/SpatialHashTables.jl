@@ -7,78 +7,7 @@ using CUDA, KernelAbstractions
 using LinearAlgebra, StaticArrays
 using ThreadsX
 
-unval(::Val{x}) where {x} = x
 
-struct HashGrid{Dim, NThreads, IntT <: Integer, FltT <: Real, IntVecT <: AbstractVector, BT} 
-    cellwidth::NTuple{Dim,FltT}
-    cellwidthinv::NTuple{Dim,FltT}
-
-    pointcellidx::IntVecT 
-    pointidx::IntVecT
-
-    cellstarts::IntVecT
-    cellends::IntVecT 
-    numcells::IntT
-
-    gridsize::NTuple{Dim,IntT} 
-    strides::NTuple{Dim,IntT}
-
-    backend::BT
-    nthreads::NThreads
-end
-
-Dim(hg::HashGrid) = length(hg.cellwidth)
-FloatType(hg::HashGrid) = eltype(hg.cellwidth)
-IntType(hg::HashGrid) = eltype(hg.gridsize)
-
-function HashGrid(IndexVecType::Type, points, radius, gridsize, 
-                    nthreads = eltype(points) == Float32 ? 1024 : Threads.nthreads())
-    IntT = eltype(IndexVecType)
-    gridsize = convert.(IntT, gridsize)
-    Dim = length(gridsize)
-
-    cellwidth = ntuple(i -> get(radius, i, radius[end]), Dim)
-    cellwidthinv = 1 ./ cellwidth
-
-    pointcellidx = IndexVecType(undef, length(points))
-    pointidx = IndexVecType(undef, length(points))
-
-    strides = convert.(IntT, cumprod((1,gridsize...)[1:end-1]))
-    numcells = convert(IntT, prod(gridsize))
-
-    cellstarts = IndexVecType(undef, numcells)
-    cellends = IndexVecType(undef, numcells)
-
-    return HashGrid(cellwidth, cellwidthinv, pointcellidx, pointidx, cellstarts, cellends, numcells, Tuple(gridsize), Tuple(strides), get_backend(points), Val(nthreads))
-end
-
-
-using Adapt
-function Adapt.adapt_structure(to, hg::HashGrid) 
-    HashGrid(
-        hg.cellwidth,
-        hg.cellwidthinv,
-        Adapt.adapt_structure(to, hg.pointcellidx),
-        Adapt.adapt_structure(to, hg.pointidx),
-        Adapt.adapt_structure(to, hg.cellstarts),
-        Adapt.adapt_structure(to, hg.cellends), 
-        hg.numcells,
-        hg.gridsize,
-        hg.strides,
-        hg.backend,
-        hg.nthreads)
-end
-
-
-@inline function index2hash(hg, ind)
-    IntT = IntType(hg)
-    return sum(@. (mod1(ind, hg.gridsize) - one(IntT)) * hg.strides) + one(IntT)
-end
-
-@inline function pos2hash(hg, pos)
-    IntT = IntType(hg)
-    return index2hash(hg, @.(ceil(IntT,pos * hg.cellwidthinv)))
-end
 
 
 @kernel function compute_cell_indices_kernel!(hg, X)
@@ -137,7 +66,7 @@ end
 
 
 
-
+cu 
 SVec3 = SVector{3,Float32}
 
 X_cpu, _ = CellListMap.xatomic(10^6)
@@ -163,47 +92,72 @@ hg_cpu = HashGrid(Vector{Int64}, X_cpu, box.cell_size, box.nc)
 
 # @profview updatecells!(hg_cpu, X_cpu)
 
+function cellcontent(hg, cellind)
 
+end
 
-struct HashGridQuery{IT <: Integer, PT, RT, HG}
-    boxposition::PT
-    boxranges::RT
-    centerindex::IT  # cell index of the center position 
-    cellindex::IT    # 
-    cellend::IT
+struct HashGridQuery{CIndsT <: CartesianIndices, HG <: HashGrid}
+    cellindices::CIndsT
     grid::HG
 end
 
+function neighbours(hg, pos, r)
+    starts =      pos2index(hg, pos .- r)
+    ends   = min.(pos2index(hg, pos .+ r), @. starts + hg.gridsize - 1)
+    cellindices = CartesianIndices( ntuple( i -> starts[i]:ends[i], Dim(hg)))
 
-function createquery(hg, pos, r)
-    IntT = IntType(hg)
-    starts = @. round(IntT, (pos - r) * hg.inv_cellsize)
-    ends   = @. min(round(IntT, (pos + r) * ht.inv_cellsize), starts + ht.gridsize - 1)
-
-    firstcell = starts 
-    cell = hashindex(ht, ind)
-    cellpointidx = ht.cell_starts[cell]
-    cell_end = ht.cell_ends[cell]    
-
-    return (starts, ends)
+    return HashGridQuery(cellindices, hg)
 end
 
-function next_in
+function Base.iterate(query::HashGridQuery)
+    cellind = first(query.cellindices)
+    linearidx = LinearIndices(query.grid.gridsize)[cellind]
+    i       = query.grid.cellstarts[linearidx]
+    cellend = query.grid.cellends[linearidx]
+
+    initstate = (cellind, i-1, cellend)
+
+    return iterate(query, initstate)
+end
+
+function Base.iterate(query::HashGridQuery, state)
+    (cellind, i, cellend) = state
+
+    while true
+        if i <= cellend
+            k = query.grid.pointidx[i]
+            return (k, (cellind, i+1, cellend))
+        else
+            next = iterate(query.cellindices, cellind)
+
+            if isnothing(next)
+                return nothing 
+            end
+
+            cellind = next[1]
+            linearidx = LinearIndices(query.grid.gridsize)[cellind]
+            i       = query.grid.cellstarts[linearidx]
+            cellend = query.grid.cellends[linearidx]
+        end
+    end
+end
+
+
+
 
 @kernel function compute_energy(forces, X, hg)
     tid = @index(Global) 
 
-    query = create_query(hg, X[tid], 12.0)
+    Xi = X[tid]
 
-    for i in query 
-        xij = X[tid] - X[i]
+    for j in neighbours(hg, X[tid], 12.0) 
+        xij = Xi - X[j]
         forces[tid] = xij / norm(xij)
     end
 
 end 
 
 forces = similar(X)
-
 compute_energy(hg.backend, unval(hg.nthreads))(forces, X, hg, ndrange = length(X))
 
 
