@@ -78,24 +78,22 @@ end
 # - grid (gridindex, cartesian) 
 # - hash (cellindex, linear)
 
-@inline function pos2grid(grid, pos, correction = :mod)
+@inline function pos2grid(grid, pos)
     IntT = inttype(grid)
-
-    ind = Tuple(@. ceil(IntT, (pos - grid.origin) * grid.cellwidthinv))
-
-    if correction == :mod
-        ind = mod1.(ind, grid.gridsize)
-    end
-
-    return CartesianIndex(ind)
+    ind = @. mod1(ceil(IntT, (pos - grid.origin) * grid.cellwidthinv), grid.gridsize)
+    return CartesianIndex(Tuple(ind))
 end
 
 @inline grid2hash(grid, ind) = linearindices(grid)[ind]
 @inline pos2hash(grid, pos) = grid2hash(grid, pos2grid(grid, pos))
 
+function pos2grid_unbound(grid, pos)
+    IntT = inttype(grid)
+    ind = ceil.(IntT, (pos - grid.origin) .* grid.cellwidthinv)
+    return CartesianIndex(ind...)
+end
 
 # update functions
-
 @kernel function compute_cell_hashes_kernel!(hg, pts)
     tid = @index(Global)
     hg.cellidx[tid] = pos2hash(hg, pts[tid])
@@ -173,14 +171,14 @@ Base.IteratorSize(::HashGridQuery) = Base.SizeUnknown()
 Base.eltype(query::HashGridQuery) = eltype(query.grid.pointidx) 
 
 function HashGridQuery(hg::HashGrid, pos, r)
-    starts =     pos2grid(hg, pos .- r, :unbound)
-    ends   = min(pos2grid(hg, pos .+ r, :unbound), CartesianIndex(Tuple(starts) .+ hg.gridsize .- 1))
+    starts =     pos2grid_unbound(hg, pos .- r)
+    ends   = min(pos2grid_unbound(hg, pos .+ r), CartesianIndex(Tuple(starts) .+ hg.gridsize .- 1))
     cellindices = starts:ends
     
     return HashGridQuery(hg, cellindices)
 end
 
-warpindex(hg, ind) = CartesianIndex( mod1.(Tuple(ind), hg.gridsize)... )
+warpindex(hg, ind) = CartesianIndex(mod1.(Tuple(ind), hg.gridsize))
 
 function Base.iterate(query::HashGridQuery)
     cellind = first(query.cellindices)
