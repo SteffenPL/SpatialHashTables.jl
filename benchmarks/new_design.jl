@@ -13,7 +13,7 @@ struct HashGrid{Dim, NThreads, IntT <: Integer, FltT <: Real, IntVecT <: Abstrac
     cellwidth::NTuple{Dim,FltT}
     cellwidthinv::NTuple{Dim,FltT}
 
-    pointtocell::IntVecT 
+    pointcellidx::IntVecT 
     pointidx::IntVecT
 
     cellstarts::IntVecT
@@ -27,8 +27,9 @@ struct HashGrid{Dim, NThreads, IntT <: Integer, FltT <: Real, IntVecT <: Abstrac
     nthreads::NThreads
 end
 
-
-
+Dim(hg::HashGrid) = length(hg.cellwidth)
+FloatType(hg::HashGrid) = eltype(hg.cellwidth)
+IntType(hg::HashGrid) = eltype(hg.gridsize)
 
 function HashGrid(IndexVecType::Type, points, radius, gridsize, 
                     nthreads = eltype(points) == Float32 ? 1024 : Threads.nthreads())
@@ -39,7 +40,7 @@ function HashGrid(IndexVecType::Type, points, radius, gridsize,
     cellwidth = ntuple(i -> get(radius, i, radius[end]), Dim)
     cellwidthinv = 1 ./ cellwidth
 
-    pointtocell = IndexVecType(undef, length(points))
+    pointcellidx = IndexVecType(undef, length(points))
     pointidx = IndexVecType(undef, length(points))
 
     strides = convert.(IntT, cumprod((1,gridsize...)[1:end-1]))
@@ -48,64 +49,88 @@ function HashGrid(IndexVecType::Type, points, radius, gridsize,
     cellstarts = IndexVecType(undef, numcells)
     cellends = IndexVecType(undef, numcells)
 
-    return HashGrid(cellwidth, cellwidthinv, pointtocell, pointidx, cellstarts, cellends, numcells, Tuple(gridsize), Tuple(strides), get_backend(points), Val(nthreads))
-end
-
-@inline function hashindex(gridsize, strides, ind::Base.AbstractVecOrTuple{IT}) where {IT <: Integer}
-    return sum(@. (mod1(ind, gridsize)-1) * strides) + 1
-end
-
-@inline function hashindex(cellwidthinv, gridsize, strides, pos)
-    IntT = eltype(gridsize)
-    return hashindex(gridsize, strides, @.(ceil(IntT, pos * cellwidthinv)))
+    return HashGrid(cellwidth, cellwidthinv, pointcellidx, pointidx, cellstarts, cellends, numcells, Tuple(gridsize), Tuple(strides), get_backend(points), Val(nthreads))
 end
 
 
-@kernel function compute_cell_indices_kernel!(cellwidthinv, gridsize, strides, pointtocell, pointidx, X)
+using Adapt
+function Adapt.adapt_structure(to, hg::HashGrid) 
+    HashGrid(
+        hg.cellwidth,
+        hg.cellwidthinv,
+        Adapt.adapt_structure(to, hg.pointcellidx),
+        Adapt.adapt_structure(to, hg.pointidx),
+        Adapt.adapt_structure(to, hg.cellstarts),
+        Adapt.adapt_structure(to, hg.cellends), 
+        hg.numcells,
+        hg.gridsize,
+        hg.strides,
+        hg.backend,
+        hg.nthreads)
+end
+
+
+@inline function index2hash(hg, ind)
+    IntT = IntType(hg)
+    return sum(@. (mod1(ind, hg.gridsize) - one(IntT)) * hg.strides) + one(IntT)
+end
+
+@inline function pos2hash(hg, pos)
+    IntT = IntType(hg)
+    return index2hash(hg, @.(ceil(IntT,pos * hg.cellwidthinv)))
+end
+
+
+@kernel function compute_cell_indices_kernel!(hg, X)
     tid = @index(Global)
-    pointtocell[tid] = hashindex(cellwidthinv, gridsize, strides, X[tid])
-    pointidx[tid] = tid 
+    hg.pointcellidx[tid] = pos2hash(hg, X[tid])
+    hg.pointidx[tid] = tid 
 end
 
 function compute_cell_indices!(hg, X, nthreads = hg.nthreads)
-    compute_cell_indices_kernel!(hg.backend, unval(nthreads))(hg.cellwidthinv, hg.gridsize, hg.strides, hg.pointtocell, hg.pointidx, X, ndrange = length(X))
+    compute_cell_indices_kernel!(hg.backend, unval(nthreads))(hg, X, ndrange = length(X))
 end
 
-
-
-@kernel function compute_cell_offsets_kernel!(cellstarts, cellends, pointtocell, numpoints)
+@kernel function compute_cell_offsets_kernel!(hg)
     tid = @index(Global)
 
-    c = pointtocell[tid]
+    c = hg.pointcellidx[tid]
     if tid == 1
-        cellstarts[c] = 1
+        hg.cellstarts[c] = 1
     else
-        p = pointtocell[tid-1]
+        p = hg.pointcellidx[tid-1]
         if c != p
-            cellstarts[c] = tid 
-            cellends[p] = tid-1
+            hg.cellstarts[c] = tid 
+            hg.cellends[p] = tid-1
         end
     end
 
-    if tid == numpoints
-        cellends[c] = numpoints
+    if tid == length(hg.pointidx)
+        hg.cellends[c] = length(hg.pointidx)
     end
 end
 
 function compute_cell_offsets!(hg, nthreads = hg.nthreads)
-    compute_cell_offsets_kernel!(hg.backend, unval(nthreads))(hg.cellstarts, hg.cellends, hg.pointtocell, hg.numcells, ndrange = length(hg.pointtocell))
+    compute_cell_offsets_kernel!(hg.backend, unval(nthreads))(hg, ndrange = length(hg.pointcellidx))
+end
+
+
+function paired_sort!(ix, a, backend, nthreads)
+    if backend isa CUDABackend
+        CUDA.sortperm!(ix, a)
+        CUDA.permute!(ix, a)
+    elseif backend isa CPU && unval(nthreads) > 1
+        sortperm!(ix, a, alg = ThreadsX.QuickSort)
+        permute!(ix, a)
+    else
+        sortperm!(ix, a)
+        permute!(ix, a)
+    end
 end
 
 function updatecells!(hg, X, nthreads = hg.nthreads)    
     compute_cell_indices!(hg, X, nthreads)
-
-    if hg.backend isa CUDABackend
-        CUDA.sortperm!(hg.pointidx, hg.pointtocell)
-        CUDA.permute!(hg.pointtocell, hg.pointidx)
-    elseif hg.backend isa CPU
-        sortperm!(hg.pointidx, hg.pointtocell, alg = ThreadsX.QuickSort)
-        permute!(hg.pointtocell, hg.pointidx)
-    end
+    paired_sort!(hg.pointidx, hg.pointcellidx, hg.backend, nthreads)
     compute_cell_offsets!(hg, nthreads)
     KernelAbstractions.synchronize(hg.backend)
 end
@@ -138,50 +163,37 @@ hg_cpu = HashGrid(Vector{Int64}, X_cpu, box.cell_size, box.nc)
 
 # @profview updatecells!(hg_cpu, X_cpu)
 
-using Adapt
-hgt = HashGrid{3, Val{48}, Int32, Float32, CuArray{Int32, 1, CUDA.Mem.DeviceBuffer}, CUDABackend}
-function Adapt.adapt_structure(to, hg::HashGrid) 
-    HashGrid(
-        hg.cellwidth,
-        hg.cellwidthinv,
-        Adapt.adapt_structure(to, hg.pointtocell),
-        Adapt.adapt_structure(to, hg.pointidx),
-        Adapt.adapt_structure(to, hg.cellstarts),
-        Adapt.adapt_structure(to, hg.cellends), 
-        hg.numcells,
-        hg.gridsize,
-        hg.strides,
-        hg.backend,
-        hg.nthreads)
-end
 
 
 struct HashGridQuery{IT <: Integer, PT, RT, HG}
     boxposition::PT
     boxranges::RT
-    cell::IT 
-    cellindex::IT 
+    centerindex::IT  # cell index of the center position 
+    cellindex::IT    # 
     cellend::IT
     grid::HG
 end
 
 
-function create_query(ht, r, pos)
-    starts = @. round(Int, (pos - r) * ht.inv_cellsize)
-    ends   = @. min(round(Int, (pos + r) * ht.inv_cellsize), starts + ht.gridsize - 1)
+function createquery(hg, pos, r)
+    IntT = IntType(hg)
+    starts = @. round(IntT, (pos - r) * hg.inv_cellsize)
+    ends   = @. min(round(IntT, (pos + r) * ht.inv_cellsize), starts + ht.gridsize - 1)
 
-    ind = starts 
-    cells = hashindex(ht, ind)
-    cell_index = ht.cell_starts[cell]
+    firstcell = starts 
+    cell = hashindex(ht, ind)
+    cellpointidx = ht.cell_starts[cell]
     cell_end = ht.cell_ends[cell]    
 
     return (starts, ends)
 end
 
+function next_in
+
 @kernel function compute_energy(forces, X, hg)
     tid = @index(Global) 
 
-    query = create_query(hg, 12.0, X[tid])
+    query = create_query(hg, X[tid], 12.0)
 
     for i in query 
         xij = X[tid] - X[i]
