@@ -43,7 +43,7 @@ function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend =
     Dim = length(gridsize)
     FltT = eltype(origin)
 
-    cellwidth = SVector(ntuple(i -> get(radius, i, radius[end]), Dim))
+    cellwidth = SVector(ntuple(i -> @compat(get(radius, i, radius[end])), Dim))
     cellwidthinv = one(FltT) ./ cellwidth
 
     cellidx  = IndexVecT(undef, npts)

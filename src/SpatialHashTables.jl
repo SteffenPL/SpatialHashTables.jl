@@ -3,6 +3,7 @@ module SpatialHashTables
 using StaticArrays
 using KernelAbstractions
 import Adapt: adapt_structure
+using Compat
 
 # elementary definitions
 unval(::Val{x}) where {x} = x
