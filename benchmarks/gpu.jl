@@ -7,54 +7,15 @@ using BenchmarkTools
 using ChunkSplitters
 using Base.Threads
 
+using CUDA
+using KernelAbstractions
+
 @inline dist_sq(x,y) = sum(abs2, x - y)
 @inline function energy(x, y, i, j, d2, u, cutoff)
     if d2 < cutoff^2
         u += dist_sq(x,y)
     end
     return u 
-end
-
-function innerloop(grid, X, r, i, Xi, e)
-    for j in HashGridQuery(grid, X[i], r)
-        if i < j
-            e = energy(X[i], X[j], i, j, dist_sq(X[i], X[j]), e, r)
-        end
-    end
-    return e
-end
-
-function batch(grid, X, r, i, e)
-    tid = Threads.threadid()
-    Xi = X[i]
-    ei = 0.0
-    @inbounds for j in HashGridQuery(grid, Xi, r)
-        if j < i
-            Xj = X[j]
-            ei = energy(Xi, Xj, i, j, dist_sq(Xi, Xj), ei, r)
-        end
-    end
-    e[tid] += ei 
-    return nothing
-end
-
-function test_parallel(grid, X, r)
-    nchunks = Threads.nthreads()
-    e = zeros(nchunks)
-    Threads.@threads for i in eachindex(X)
-        batch(grid, X, r, i, e) 
-    end
-    return sum(e)
-end
-
-function test_naive(X, r)
-    e = 0.0
-    for i in eachindex(X)
-        for j in 1:i
-            e = energy(X[i], X[j], i, j, dist_sq(X[i], X[j]), e, r)
-        end
-    end
-    return e
 end
 
 function run_celllistmap(box,cl)
@@ -65,25 +26,21 @@ function run_celllistmap(box,cl)
     return u
 end
 
-x, _ = CellListMap.xatomic(10^5)
-box = Box(limits(x), 12.0)
-cl = CellList(x, box)
+X, _ = CellListMap.xatomic(10^5)
+box = Box(limits(X), 12.0)
+cl = CellList(X, box)
 
-N = length(x)
+N = length(X)
 r = box.cutoff
-Dim = length(eltype(x))
-X = x
+Dim = length(eltype(X))
 ht = HashGrid(X, r, Tuple(box.nc))
 updatecells!(ht, X)
 
-using CUDA
 Xg = cu(SVector{3,Float32}.(X))
 cellwidth = Float32.(r) 
 gridsize = Int32.(Tuple(box.nc))
 grid = HashGrid{CuVector{Int32}}(Xg, cellwidth, gridsize, nthreads = 1024)
 updatecells!(grid, Xg)
-
-using KernelAbstractions
 
 @kernel function inner_gpu!(grid, X, e, r)
     i = @index(Global)
@@ -99,7 +56,6 @@ using KernelAbstractions
     e[i] = e0
 end
 
-
 e = CUDA.zeros(length(X))
 
 function parallel_gpu(grid, X, r, e)
@@ -108,12 +64,8 @@ function parallel_gpu(grid, X, r, e)
     return e
 end
 
-# @time parallel_gpu(grid, Xg, cellwidth, e)
-# @time run_celllistmap(box, cl)
-
-parallel_gpu(grid, Xg, cellwidth, e)
+@time parallel_gpu(grid, Xg, cellwidth, e)
 @time parallel_gpu(grid, Xg, cellwidth, e)
 
 CUDA.@profile parallel_gpu(grid, Xg, cellwidth, e)
 
-# res = parallel_gpu(ht, X, r)

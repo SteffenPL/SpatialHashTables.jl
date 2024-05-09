@@ -1,4 +1,4 @@
-struct HashGrid{Dim, FltT<:Real, IntVecT, IntT, BackendT, NThreads} 
+struct HashGrid{Dim, FltT<:Real, IntVecT, IntT, LIndT, BackendT, NThreads} 
     
     cellwidth::SVector{Dim,FltT}
     cellwidthinv::SVector{Dim,FltT}
@@ -13,6 +13,8 @@ struct HashGrid{Dim, FltT<:Real, IntVecT, IntT, BackendT, NThreads}
     cellstarts::IntVecT
     cellends::IntVecT 
 
+    lininds::LIndT
+
     backend::BackendT
     nthreads::NThreads
 end
@@ -21,7 +23,7 @@ end
 
 dimension(hg::HashGrid) = length(hg.gridsize)
 inttype(hg::HashGrid) = eltype(hg.gridsize)
-linearindices(hg::HashGrid) = LinearIndices(hg.gridsize)
+linearindices(hg::HashGrid) = hg.lininds
 cartesianindices(hg::HashGrid) = CartesianIndices(hg.gridsize)
 floattype(hg::HashGrid) = eltype(hg.cellwidth)
 
@@ -53,7 +55,9 @@ function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend =
     cellstarts = IndexVecT(undef, ncells)
     cellends   = IndexVecT(undef, ncells)
 
-    return HashGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, backend, Val(nthreads))
+    lininds = LinearIndices(gridsize)
+
+    return HashGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, lininds, backend, Val(nthreads))
 end
 
 function HashGrid{IndexVecType}(pts, cellwidth, gridsize;
@@ -62,7 +66,9 @@ function HashGrid{IndexVecType}(pts, cellwidth, gridsize;
     
     npts = length(pts)
     backend = get_backend(pts)
-    return HashGrid{IndexVecType}(cellwidth, gridsize, origin, npts, nthreads, backend)
+    grid = HashGrid{IndexVecType}(cellwidth, gridsize, origin, npts, nthreads, backend)
+    updatecells!(grid, pts)
+    return grid
 end
 
 HashGrid(pts::Vector{SVector{Dim,Float64}}, args...; kwargs...) where {Dim} = HashGrid{Vector{Int64}}(pts, args...; kwargs...)
@@ -89,8 +95,8 @@ end
 
 function pos2grid_unbound(grid, pos)
     IntT = inttype(grid)
-    ind = ceil.(IntT, (pos - grid.origin) .* grid.cellwidthinv)
-    return CartesianIndex(ind...)
+    ind = @. ceil(IntT, (pos - grid.origin) * grid.cellwidthinv)
+    return CartesianIndex(Tuple(ind))
 end
 
 # update functions
@@ -170,6 +176,7 @@ end
 Base.IteratorSize(::HashGridQuery) = Base.SizeUnknown()
 Base.eltype(query::HashGridQuery) = eltype(query.grid.pointidx) 
 
+
 function HashGridQuery(hg::HashGrid, pos, r)
     starts =     pos2grid_unbound(hg, pos .- r)
     ends   = min(pos2grid_unbound(hg, pos .+ r), CartesianIndex(Tuple(starts) .+ hg.gridsize .- 1))
@@ -178,15 +185,16 @@ function HashGridQuery(hg::HashGrid, pos, r)
     return HashGridQuery(hg, cellindices)
 end
 
-warpindex(hg, ind) = CartesianIndex(mod1.(Tuple(ind), hg.gridsize))
+function warplinear(grid, ind) 
+    g = grid.gridsize
+    return mod1(ind[1],g[1]) + (mod1(ind[2],g[2])-1)*g[1] + (mod1(ind[3],g[3])-1)*g[1]*g[2]
+    # return linearindices(grid)[CartesianIndex(mod1.(Tuple(ind), grid.gridsize))]
+end 
+
 
 function Base.iterate(query::HashGridQuery)
     cellind = first(query.cellindices)
-    linind = LinearIndices(query.grid.gridsize)
-    if isempty(linind)
-        return nothing 
-    end
-    linearidx = linind[warpindex(query.grid, cellind)]
+    linearidx = warplinear(query.grid, cellind)
     i       = query.grid.cellstarts[linearidx]
     cellend = query.grid.cellends[linearidx]
 
@@ -204,15 +212,33 @@ function Base.iterate(query::HashGridQuery, state)
             return (k, (cellind, i+1, cellend))
         else
             next = iterate(query.cellindices, cellind)
-
+            
             if isnothing(next)
                 return nothing 
             end
 
             cellind = next[1]
-            linearidx = LinearIndices(query.grid.gridsize)[warpindex(query.grid, cellind)]
+            linearidx = warplinear(query.grid, cellind)
             i       = query.grid.cellstarts[linearidx]
             cellend = query.grid.cellends[linearidx]
         end
-    end
+    end 
+
+    # while true
+    #     if i <= cellend
+    #         k = query.grid.pointidx[i]
+    #         return (k, (cellind, i+1, cellend))
+    #     else
+    #         next = iterate(query.cellindices, cellind)
+
+    #         if isnothing(next)
+    #             return nothing 
+    #         end
+
+    #         cellind = next[1]
+    #         linearidx = LinearIndices(query.grid.gridsize)[warpindex(query.grid, cellind)]
+    #         i       = query.grid.cellstarts[linearidx]
+    #         cellend = query.grid.cellends[linearidx]
+    #     end
+    # end
 end
