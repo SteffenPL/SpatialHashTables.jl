@@ -182,7 +182,11 @@ warpindex(hg, ind) = CartesianIndex(mod1.(Tuple(ind), hg.gridsize))
 
 function Base.iterate(query::HashGridQuery)
     cellind = first(query.cellindices)
-    linearidx = LinearIndices(query.grid.gridsize)[warpindex(query.grid, cellind)]
+    linind = LinearIndices(query.grid.gridsize)
+    if isempty(linind)
+        return nothing 
+    end
+    linearidx = linind[warpindex(query.grid, cellind)]
     i       = query.grid.cellstarts[linearidx]
     cellend = query.grid.cellends[linearidx]
 

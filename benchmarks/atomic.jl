@@ -16,9 +16,9 @@ end
 
 
 
-dist_sq(x,y) = sum(abs2, x - y)
+@inline dist_sq(x,y) = sum(abs2, x - y)
 
-function energy(x, y, i, j, d2, u, cutoff)
+@inline function energy(x, y, i, j, d2, u, cutoff)
     if d2 < cutoff^2
         u += dist_sq(x,y)
     end
@@ -75,7 +75,7 @@ function run_celllistmap(box,cl)
     return u
 end
 
-x, _ = CellListMap.xatomic(10^6)
+x, _ = CellListMap.xatomic(10^5)
 box = Box(limits(x), 12.0)
 cl = CellList(x, box)
 
@@ -86,41 +86,44 @@ X = x
 ht = HashGrid(X, r, Tuple(box.nc))
 updatecells!(ht, X)
 
-using CUDA
-Xg = cu(SVector{3,Float32}.(X))
-cellwidth = Float32.(r) 
-gridsize = Int32.(Tuple(box.nc))
-grid = HashGrid{CuVector{Int32}}(Xg, cellwidth, gridsize, nthreads = 1024)
-updatecells!(grid, Xg)
+# using CUDA
+# Xg = cu(SVector{3,Float32}.(X))
+# cellwidth = Float32.(r) 
+# gridsize = Int32.(Tuple(box.nc))
+# grid = HashGrid{CuVector{Int32}}(Xg, cellwidth, gridsize, nthreads = 1024)
+# updatecells!(grid, Xg)
+
+# using KernelAbstractions
+
+# @kernel function inner_gpu!(grid, X, e, r)
+#     i = @index(Global)
+#     Xi = X[i]
+
+#     e0 = 0.0f0
+#     for j in HashGridQuery(grid, Xi, r)         
+#         Xj = X[j]
+#         if i < j
+#             e0 = energy(Xi, Xj, i, j, dist_sq(Xi, Xj), e0, r)
+#         end
+#     end
+#     e[i] = e0
+# end
 
 
-@kernel function inner_gpu!(grid, X, e, r)
-    i = @index(Global)
-    Xi = X[i]
+# e = CUDA.zeros(length(X))
 
-    e0 = 0.0f0
-    for j in HashGridQuery(grid, Xi, r)         
-        Xj = X[j]
-        if i < j
-            e0 = energy(Xi, Xj, i, j, dist_sq(Xi, Xj), e0, r)
-        end
-    end
-    e[i] = e0
-end
+# function parallel_gpu(grid, X, r, e)
+#     inner_gpu!(grid.backend, 1024)(grid, X, e, r, ndrange = length(X))
+#     KernelAbstractions.synchronize(grid.backend)
+#     return e
+# end
 
-using KernelAbstractions
+# @time parallel_gpu(grid, Xg, cellwidth, e)
+# @time run_celllistmap(box, cl)
 
-e = CUDA.zeros(length(X))
+# CUDA.@profile parallel_gpu(grid, Xg, cellwidth, e)
 
-function parallel_gpu(grid, X, r, e)
-    inner_gpu!(grid.backend, 1024)(grid, X, e, r, ndrange = length(X))
-    return CUDA.sum(e)
-end
-
-@time parallel_gpu(grid, Xg, cellwidth, e)
-@time run_celllistmap(box, cl)
-
-res = parallel_gpu(ht, X, r)
+# res = parallel_gpu(ht, X, r)
 
 test_parallel(ht, X, r)
 map_pairwise!((x,y,i,j,d2,u) -> energy(x,y,i,j,d2,u,box.cutoff), 0.0, box, cl)
@@ -149,6 +152,53 @@ function energy(x, y, i, j, d2, u, cutoff)
     end
     return u 
 end
+
+
+function batchs(grid, X, r, i, e)
+    Xi = X[i]
+    ei = e
+    @inbounds for j in HashGridQuery(grid, Xi, r)
+        if j < i
+            Xj = X[j]
+            ei = energy(Xi, Xj, i, j, dist_sq(Xi, Xj), ei, r)
+        end
+    end
+    return ei 
+end
+
+
+@check_allocs function test_serial(grid, X, r)
+    e = zeros(1)
+    for i in eachindex(X)
+        e = batchs(grid, X, r, i, e) 
+    end
+    return sum(e)
+end
+
+using AllocCheck
+
+test_serial(ht, X, r)
+
+@time test_serial(ht, X, r)
+
+@profview test_serial(ht, X, r)
+
+using JET 
+@report_call test_serial(ht, X, r)
+
+
+1
+
+
+
+
+
+
+
+
+
+
+
 
 function batch(grid, X, r, i, Xi, ei)
     for j in HashGridQuery(grid, Xi, r)
