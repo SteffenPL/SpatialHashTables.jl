@@ -120,9 +120,8 @@ function forcebenchmark(N, ptsgen,
     df = DataFrame()
 
     # CPU setup
-    X, r, bounds = ptsgen(N)
-    gridsize = Tuple(@. ceil(Int, (bounds[2] - bounds[1]) / r))
-    grid = HashGrid(X, bounds..., gridsize)
+    X, bounds, r = ptsgen(N)
+    grid = HashGrid(X, bounds..., r)
 
     # CellListMap setup 
     system = ParticleSystem(
@@ -138,9 +137,8 @@ function forcebenchmark(N, ptsgen,
         X_gpu = cu(SVec3f.(X))
         r_gpu = Float32(r)
         bounds_gpu = SVec3f.(bounds)
-        gridsize_gpu = Int32.(gridsize)
 
-        grid_gpu = HashGrid{CUDA.CuVector{Int32}}(X_gpu, bounds_gpu..., gridsize_gpu; nthreads = 1024)
+        grid_gpu = HashGrid{CUDA.CuVector{Int32}}(X_gpu, bounds_gpu..., r_gpu; nthreads = 256)
     end
 
     F_n = similar(X)

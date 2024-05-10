@@ -11,6 +11,7 @@ collectsysteminfo(joinpath(basename, "sysinfo"))
 
 
 
+# BenchmarkTools.DEFAULT_PARAMETERS.samples = 10
 
 # Case 1: Uniform points with fixed number of particles per ideal inner loop
 
@@ -18,10 +19,9 @@ function example_uniform(N)
     r = 1/N^(1/3)
     X = rand(SVector{3, Float64}, N)
 
-    return X, r, (@SVector[0.0,0.0,0.0], @SVector[1.0,1.0,1.0])
+    return X, (@SVector[0.0,0.0,0.0], @SVector[1.0,1.0,1.0]), r
 end
 
-BenchmarkTools.DEFAULT_PARAMETERS.samples = 10
 
 df_unif1 = forcebenchmark(      100, example_uniform, "uniform")
 df_unif2 = forcebenchmark(    1_000, example_uniform, "uniform")
@@ -33,7 +33,7 @@ df_unif5 = forcebenchmark(1_000_000, example_uniform, "uniform"; naive = false, 
 #            for N in 10 ^ 2:6)
 
 df_unif = vcat(df_unif1, df_unif2, df_unif3, df_unif4, df_unif5)
-df_unif = vcat(dfs...)
+# df_unif = vcat(dfs...)
 
 CSV.write(joinpath(basename, "uniform.csv"), df_unif)
 
@@ -55,15 +55,30 @@ function example_atomic(N)
     r = box.cutoff
     upperbound = diag(box.aligned_unit_cell.matrix)
 
-    return X, r, (@SVector[0.0,0.0,0.0], upperbound)
+    return X, (@SVector[0.0,0.0,0.0], upperbound), r
 end
 
-df_atom2 = forcebenchmark(    5_000, example_atomic, "uniform")
-df_atom3 = forcebenchmark(   10_000, example_atomic, "uniform")
-df_atom4 = forcebenchmark(  100_000, example_uniform, "uniform"; naive = false, serial = false)
-df_atom5 = forcebenchmark(1_000_000, example_uniform, "uniform"; naive = false, serial = false)
+# X, b, r = example_atomic(10_000)
+# system = ParticleSystem(
+#         xpositions = X, 
+#         unitcell = b[2],
+#         cutoff = r, 
+#         output = similar(X),
+#         output_name = :forces
+#     )
 
-df_xatomic = vcat(df_atom2,df_atom3,df_atom4)#,df_atom5)
+# grid = HashGrid(X, b..., r)
+
+Ns = [3_000, 10_000, 30_000, 100_000, 300_000, 1_000_000, 3_000_000]
+dfs_atomic = []
+
+for N in Ns
+    push!(dfs_atomic,
+    forcebenchmark(N, example_atomic, "uniform"; naive = N < 10_000, serial = N < 200_000)
+    )
+end
+
+df_xatomic = vcat(dfs_atomic...)
 CSV.write(joinpath(basename, "xatomic.csv"), df_xatomic)
 
 @df df_xatomic plot(:N, :time_median, 

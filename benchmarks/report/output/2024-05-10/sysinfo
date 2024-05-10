@@ -1,0 +1,2 @@
+cpu = "AMD Ryzen Threadripper PRO 5965WX 24-Cores: \n          speed         user         nice          sys         idle          irq\n#1-48  1800 MHz     839120 s       1970 s     127497 s   49320746 s          0 s\n"
+gpu = "NVIDIA RTX A4000"
