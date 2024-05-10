@@ -48,6 +48,7 @@ CSV.write(joinpath(basename, "uniform.csv"), df_unif)
                 ylabel = "seconds (median)",
                 title = "Uniform random particles with r = 1/N³")
 
+savefig(joinpath(basename, "uniform.png"))
 
 # Case 2
 function example_atomic(N)
@@ -91,4 +92,7 @@ CSV.write(joinpath(basename, "xatomic.csv"), df_xatomic)
                 xlabel = "N",
                 ylabel = "seconds (median)",
                 title = "CellListMap.xatomic")
+            
                 
+savefig(joinpath(basename, "xatomic.png"))
+
