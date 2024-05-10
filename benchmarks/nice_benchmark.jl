@@ -8,7 +8,6 @@ const SVec3d = SVector{3,Float64}
 const SVec3f = SVector{3,Float32}
 
 function example_set(N)
-    N = 10_000
     r = 1/N^(1/3)
     X = rand(SVector{3, Float64}, N)
 
@@ -16,7 +15,7 @@ function example_set(N)
 end
 
 
-X, r, bounds = example_set(1000)
+X, r, bounds = example_set(10_000)
 F = similar(X)
 gridsize = Tuple(@. ceil(Int, (bounds[2] - bounds[1]) / r))
 
@@ -76,13 +75,3 @@ Fs = similar(F)
 @time test_naive!(Fn, X, r)
 @time test_singlecore!(Fs, X, r, grid)
 @time test_singlecore!(Fs, X, r, grids)
-@time test_singlecore_manual!(Fs, X, r, grid)
-
-
-# @profview test_naive!(Fn, X, r)
-# @profview test_singlecore!(Fs, X, r, grid)
-
-# @code_llvm test_singlecore!(Fs, X, r, grid)
-
-# hg = HashGridQuery(grid, X[2], r)
-
