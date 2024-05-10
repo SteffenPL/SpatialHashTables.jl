@@ -80,7 +80,7 @@ end
 
 function HashGrid{IndexVecType}(pts, cellwidth, gridsize;
                     origin = zero(eltype(pts)), 
-                    nthreads = eltype(IndexVecType) == Int32 ? 256 : div(Threads.nthreads(),2)) where {IndexVecType}
+                    nthreads = eltype(IndexVecType) == Int32 ? 256 : min(1,div(Threads.nthreads(),2))) where {IndexVecType}
     
     npts = length(pts)
     backend = get_backend(pts)
