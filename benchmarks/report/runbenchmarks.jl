@@ -75,7 +75,7 @@ dfs_atomic = []
 
 for N in Ns
     push!(dfs_atomic,
-    forcebenchmark(N, example_atomic, "uniform"; naive = N < 10_000, serial = N < 200_000)
+    forcebenchmark(N, example_atomic, "atomic"; naive = N < 10_000, serial = N < 200_000)
     )
 end
 
@@ -96,3 +96,53 @@ CSV.write(joinpath(basename, "xatomic.csv"), df_xatomic)
                 
 savefig(joinpath(basename, "xatomic.png"))
 
+
+
+
+
+
+# Case 3
+function example_galactic(N)
+    X, box = CellListMap.xgalactic(N)
+    r = box.cutoff
+    upperbound = diag(box.aligned_unit_cell.matrix)
+
+    return X, (@SVector[0.0,0.0,0.0], upperbound), r
+end
+
+# X, b, r = example_atomic(10_000)
+# system = ParticleSystem(
+#         xpositions = X, 
+#         unitcell = b[2],
+#         cutoff = r, 
+#         output = similar(X),
+#         output_name = :forces
+#     )
+
+# grid = HashGrid(X, b..., r)
+
+Ns = [30_000, 100_000, 300_000, 1_000_000]
+dfs_galactic = []
+
+for N in Ns
+    push!(dfs_galactic,
+    forcebenchmark(N, example_galactic, "galactic"; naive = N < 10_000, serial = N < 200_000)
+    )
+end
+
+df_galactic = vcat(dfs_galactic...)
+CSV.write(joinpath(basename, "xgalactic.csv"), df_galactic)
+
+@df df_galactic plot(:N, :time_median, 
+                group = (:method), 
+                xaxis=:log, 
+                yaxis=:log,
+                legend = :topleft,
+                linewidth = 2,
+                yticks = 10.0 .^ (-5:2),
+                xlabel = "N",
+                ylabel = "seconds (median)",
+                title = "CellListMap.xgalactic")
+            
+                
+savefig(joinpath(basename, "xgalactic.png"))
