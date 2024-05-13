@@ -103,10 +103,11 @@ These are the current performance benchmarks (see `benchmarks/report` folder for
 
 Notably, the package is not at is goal yet as the GPU implementation seems to give no advantage yet. Moreover, in benchmarks with many particles per collision cell (`xatomic`, `xgalatic`). In cases with less collisions (~`uniform` benchmark) our implementation is already performing well.
 
-<img src="./benchmarks/report/output/2024-05-10/xatomic.png" width="50%">
-<img src="./benchmarks/report/output/2024-05-13/xgalactic.png" width="49%">
-<img src="./benchmarks/report/output/2024-05-10/uniform.png" width="49%">
-
+<div>
+<img src="./benchmarks/report/output/2024-05-10/xatomic.png" width="45%">
+<img src="./benchmarks/report/output/2024-05-13/xgalactic.png" width="45%">
+<img src="./benchmarks/report/output/2024-05-10/uniform.png" width="45%">
+</div>
 
 ## Documentation 
 
