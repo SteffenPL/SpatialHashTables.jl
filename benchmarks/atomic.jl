@@ -167,17 +167,18 @@ function batchs(grid, X, r, i, e)
 end
 
 
-@check_allocs function test_serial(grid, X, r)
-    e = zeros(1)
+function test_serial(grid, X, r)
+    e = 0.0
     for i in eachindex(X)
         e = batchs(grid, X, r, i, e) 
     end
-    return sum(e)
+    return e
 end
 
 using AllocCheck
 
 test_serial(ht, X, r)
+@report_call test_serial(ht, X, r)
 
 @time test_serial(ht, X, r)
 
