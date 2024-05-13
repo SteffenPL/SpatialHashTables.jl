@@ -8,6 +8,8 @@
 
 **This package is not stable yet and work in progress! Consider using [CellListMap.jl](https://github.com/m3g/CellListMap.jl) instead if you need a fast and well-tested Julia implementation.**
 
+Please use `import Pkg; Pkg.add("https://github.com/SteffenPL/SpatialHashTables.jl")` to use the latest version, I didn't update the registered version yet.
+
 ## Aim 
 
 Creates spatial hash tables on bounded and unbounded domains for fast 
