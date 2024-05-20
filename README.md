@@ -77,12 +77,13 @@ grid_gpu = Hash{IndexType}(X_gpu, bnds_gpu..., r_gpu)
     i = @index(Global)
     
     Xi = X[i]
-    Fi = zero(SVec3d)
+    Fi = zero(eltype(F))
+    r² = r^2
 
     for j in HashGridQuery(grid, Xi, r)
         Xij = Xi - X[j]
         d² = sum(z -> z^2, Xij)
-        if 0 < d² < r^2
+        if zero(r) < d² < r²
             Fi += Xij / sqrt(d²)
         end 
     end
