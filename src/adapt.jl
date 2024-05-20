@@ -8,7 +8,7 @@ function adapt_structure(to, grid::HashGrid)
         adapt_structure(to, grid.pointidx),
         adapt_structure(to, grid.cellstarts),
         adapt_structure(to, grid.cellends), 
-        grid.lininds,
+        grid.strides,
         grid.backend,
         grid.nthreads)
 end

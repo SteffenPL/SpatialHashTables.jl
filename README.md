@@ -99,16 +99,16 @@ force_kernel!(grid_gpu.backend, numthreads(grid_gpu))(
 
 The above code should work with small changes on any backend compatible with KernelAbstractions.jl. 
 
-## Performance benchmarks (still a bit slow...)
+## Performance benchmarks
 
 These are the current performance benchmarks (see `benchmarks/report` folder for the implementation of the benchmark). 
 
-Notably, the package is not at is goal yet as the GPU implementation seems to give no advantage yet. Moreover, in benchmarks with many particles per collision cell (`xatomic`, `xgalatic`). In cases with less collisions (~`uniform` benchmark) our implementation is already performing well.
+Notably, the package is approaching the performance of NVIDIA Warp's HashGrid. For benchmarks with only a few particles per box (`uniform`) the performance is already good, for benchmarks with many particles per box (`xatomic`) [CellListMap.jl](https://github.com/m3g/CellListMap.jl) is faster.
 
 <div>
-<img src="./benchmarks/report/output/2024-05-10/xatomic.png" width="45%">
-<img src="./benchmarks/report/output/2024-05-13/xgalactic.png" width="45%">
-<img src="./benchmarks/report/output/2024-05-10/uniform.png" width="45%">
+<img src="./benchmarks/report/output/2024-05-21/xatomic.png" width="45%">
+<!--<img src="./benchmarks/report/output/2024-05-13/xgalactic.png" width="45%">-->
+<img src="./benchmarks/report/output/2024-05-21/uniform.png" width="45%">
 </div>
 
 ## Documentation 

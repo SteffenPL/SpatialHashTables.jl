@@ -45,27 +45,55 @@ end
     i = @index(Global)
     
     Xi = X[i]
-    Fi = zero(SVec3d)
+    Fi = zero(eltype(F))
+    r² = r^2
 
-    query = HashGridQuery(grid, X[i], r)
+    query = HashGridQuery(grid, Xi, r)
     for j in query
         Xj = X[j]
 
         Xij = warp_vec(Xi - Xj, period, periodinv)
         d² = dist_sq(Xij)
-        if 0 < d² < r^2
+        if zero(r) < d² < r²
             Fi += force_fnc(Xi, Xj, Xij, d²)
         end 
     end
     F[i] = Fi    
 end
 
+
 function forces_multithreaded!(F, X, r, grid)
     period = domainsize(grid)
-    periodinv = 1 ./ period
+    periodinv = one(eltype(period)) ./ period
 
     kernel = forces_multithreaded_kernel!(grid.backend, numthreads(grid))
     kernel(F, X, r, grid, period, periodinv, ndrange = length(X))
+
+    synchronize(grid.backend)
+    return nothing
+end
+
+@kernel function forces_multithreaded_kernel_np!(F, @Const(X), r, grid)
+    i = @index(Global)
+    
+    Xi = X[i]
+    Fi = zero(eltype(F))
+
+    query = HashGridQuery(grid, Xi, r)
+    for j in query
+        Xij = Xi - X[j]
+        d = sqrt(dist_sq(Xij))
+        if zero(d) < d < r
+            Fi += Xij / d
+        end 
+    end
+    F[i] = Fi    
+end
+
+function forces_multithreaded_np!(F, X, r, grid)
+
+    kernel = forces_multithreaded_kernel_np!(grid.backend, numthreads(grid))
+    kernel(F, X, r, grid, ndrange = length(X))
 
     synchronize(grid.backend)
     return nothing
@@ -138,7 +166,7 @@ function forcebenchmark(N, ptsgen,
         r_gpu = Float32(r)
         bounds_gpu = SVec3f.(bounds)
 
-        grid_gpu = HashGrid{CUDA.CuVector{Int32}}(X_gpu, bounds_gpu..., r_gpu; nthreads = 256)
+        grid_gpu = HashGrid{CUDA.CuVector{Int32}}(X_gpu, bounds_gpu..., r_gpu; nthreads = 32)
     end
 
     F_n = similar(X)

@@ -1,4 +1,4 @@
-struct HashGrid{Dim, FltT<:Real, IntVecT, IntT, LIndT, BackendT, NThreads} 
+struct HashGrid{Dim, FltT<:Real, IntVecT, IntT, BackendT, NThreads} 
     
     cellwidth::SVector{Dim,FltT}
     cellwidthinv::SVector{Dim,FltT}
@@ -13,7 +13,7 @@ struct HashGrid{Dim, FltT<:Real, IntVecT, IntT, LIndT, BackendT, NThreads}
     cellstarts::IntVecT
     cellends::IntVecT 
 
-    lininds::LIndT
+    strides::NTuple{Dim,IntT}
 
     backend::BackendT
     nthreads::NThreads
@@ -23,8 +23,9 @@ end
 
 dimension(grid::HashGrid) = length(grid.gridsize)
 inttype(grid::HashGrid) = eltype(grid.gridsize)
-linearindices(grid::HashGrid) = grid.lininds
-cartesianindices(grid::HashGrid) = CartesianIndices(grid.gridsize)
+oneunit(grid::HashGrid) = one(inttype(grid))
+# linearindices(grid::HashGrid) = grid.lininds
+# cartesianindices(grid::HashGrid) = CartesianIndices(grid.gridsize)
 floattype(grid::HashGrid) = eltype(grid.cellwidth)
 numthreads(grid::HashGrid) = unval(grid.nthreads)
 
@@ -35,17 +36,18 @@ Base.length(grid::HashGrid) = prod(size(grid))
 
 
 function celldomain(grid::HashGrid, i)
-    gridind = Tuple(cartesianindices(grid)[i])
-    return (grid.origin + grid.cellwidth .* (gridind .- 1), grid.origin + grid.cellwidth .* gridind)
+    one_ = oneunit(grid)
+    gridind = hash2pos(grid, i) # Tuple(cartesianindices(grid)[i])
+    return (grid.origin .+ grid.cellwidth .* (gridind .- one_), grid.origin .+ grid.cellwidth .* gridind)
 end 
 
 cellsize(grid::HashGrid, i) = grid.cellwidth
 
-Base.getindex(grid::HashGrid, k::Integer) = view(grid.pointidx, grid.cellstarts[k]:grid.cellends[k])
+@inline Base.getindex(grid::HashGrid, k::Integer) = view(grid.pointidx, grid.cellstarts[k]:grid.cellends[k])
 
-function Base.getindex(grid::HashGrid, i...) 
-    k = linearindices(grid)[i...]
-    return view(grid.pointidx, grid.cellstarts[k]:grid.cellends[k])
+@inline function Base.getindex(grid::HashGrid, i...) 
+    k = grid2hash(grid, i)
+    return grid[k]
 end
 
 function domainsize(grid::HashGrid)
@@ -62,6 +64,7 @@ end
 function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend = KernelAbstractions.CPU()) where {IndexVecT}
     Dim = length(gridsize)
     FltT = eltype(origin)
+    IntT = eltype(gridsize)
 
     cellwidth = SVector(ntuple(i -> @compat(get(radius, i, radius[end])), Dim))
     cellwidthinv = one(FltT) ./ cellwidth
@@ -73,9 +76,10 @@ function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend =
     cellstarts = IndexVecT(undef, ncells)
     cellends   = IndexVecT(undef, ncells)
 
-    lininds = LinearIndices(gridsize)
-
-    return HashGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, lininds, backend, Val(nthreads))
+    strides = cumprod(gridsize)
+    strides = IntT.((sum(strides[1:end-1]), strides[1:end-1]...))
+    
+    return HashGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, strides, backend, Val(nthreads))
 end
 
 function HashGrid{IndexVecType}(pts, cellwidth, gridsize;
@@ -97,6 +101,7 @@ function HashGrid{IndexVecType}(pts, domainstart, domainend, gridsize::NTuple; k
 end
 
 function HashGrid{IndexVecType}(pts, domainstart, domainend, r::Real; kwargs...) where {IndexVecType}
+
     gridsize = Tuple(@. floor(eltype(IndexVecType), (domainend - domainstart) ./ r))
     cellwidth = (domainend .- domainstart) ./ gridsize
     return HashGrid{IndexVecType}(pts, cellwidth, gridsize; kwargs..., origin = domainstart)
@@ -107,20 +112,27 @@ end
 # - grid (gridindex, cartesian) 
 # - hash (cellindex, linear)
 
+@inline function pos2grid_unbound(grid, pos)
+    IntT = inttype(grid)
+    ind = @. ceil(IntT, (pos - grid.origin) * grid.cellwidthinv)
+    return Tuple(ind)
+end
+
 @inline function pos2grid(grid, pos)
     IntT = inttype(grid)
     ind = @. mod1(ceil(IntT, (pos - grid.origin) * grid.cellwidthinv), grid.gridsize)
-    return CartesianIndex(Tuple(ind))
+    return Tuple(ind)
 end
 
-@inline grid2hash(grid, ind) = linearindices(grid)[ind]
+@inline function grid2hash(grid, ind) 
+    return ind[1] + sum(grid.strides[2:end] .* ind[2:end]) - grid.strides[1]
+end
 @inline pos2hash(grid, pos) = grid2hash(grid, pos2grid(grid, pos))
 
-function pos2grid_unbound(grid, pos)
-    IntT = inttype(grid)
-    ind = @. ceil(IntT, (pos - grid.origin) * grid.cellwidthinv)
-    return CartesianIndex(Tuple(ind))
+@inline function hash2pos(grid, hash::Tuple)
+    return hash
 end
+
 
 # update functions
 @kernel function compute_cell_hashes_kernel!(grid, pts)
@@ -137,13 +149,13 @@ end
     tid = @index(Global)
 
     c = grid.cellidx[tid]
-    if tid == 1
-        grid.cellstarts[c] = 1
+    if tid == one(tid)
+        grid.cellstarts[c] = one(tid)
     else
-        p = grid.cellidx[tid-1]
+        p = grid.cellidx[tid-one(tid)]
         if c != p
             grid.cellstarts[c] = tid 
-            grid.cellends[p] = tid-1
+            grid.cellends[p] = tid-one(tid)
         end
     end
 
@@ -156,18 +168,9 @@ function compute_cell_offsets!(grid, nthreads = grid.nthreads)
     compute_cell_offsets_kernel!(grid.backend, unval(nthreads))(grid, ndrange = length(grid.cellidx))
 end
 
-function paired_sort!(ix, a, modul, alg)
-    if isnothing(alg) && (!isnothing(modul) || a isa Vector)
-        getproperty(modul, :sortperm!)(ix, a)
-        getproperty(modul, :permute!)(a, ix)
-    elseif !isnothing(alg)
-        getproperty(modul, :sortperm!)(ix, a; alg)
-        getproperty(modul, :permute!)(a, ix)
-    else 
-        error("""Please select a proper module and sorting algorithm for the vector type $(typeof(a))
-        For example via `updatecells!(grid, pts; module = CUDA)`.
-        """)
-    end
+function paired_sort!(ix, a)
+    sortperm!(ix, a)
+    permute!(a, ix)
 end
 
 function updatecells!(grid, pts; modul = Base, alg = nothing, nthreads = grid.nthreads)    
@@ -179,7 +182,7 @@ function updatecells!(grid, pts; modul = Base, alg = nothing, nthreads = grid.nt
     fill!(grid.cellends,  zero(inttype(grid)))
 
     compute_cell_hashes!(grid, pts, nthreads)
-    paired_sort!(grid.pointidx, grid.cellidx, modul, alg)
+    paired_sort!(grid.pointidx, grid.cellidx)
     compute_cell_offsets!(grid, nthreads)
 
     # after this operation, pointidx[i] is a point index and cellidx[i] is the cell index containing the point 
@@ -192,9 +195,11 @@ end
 
 # iteration over neighbours 
 
-struct HashGridQuery{HG <: HashGrid, CIndsT <: CartesianIndices}
+struct HashGridQuery{HG <: HashGrid, IndT}
     grid::HG
-    cellindices::CIndsT
+    # cellindices::CIndsT
+    starts::IndT
+    ends::IndT
 end
 Base.IteratorSize(::HashGridQuery) = Base.SizeUnknown()
 Base.eltype(query::HashGridQuery) = eltype(query.grid.pointidx) 
@@ -202,18 +207,18 @@ Base.eltype(query::HashGridQuery) = eltype(query.grid.pointidx)
 
 function HashGridQuery(grid::HashGrid, pos, r)
     starts =     pos2grid_unbound(grid, pos .- r)
-    ends   = min(pos2grid_unbound(grid, pos .+ r), CartesianIndex(Tuple(starts) .+ grid.gridsize .- 1))
-    cellindices = starts:ends
+    ends   = min.(pos2grid_unbound(grid, pos .+ r), starts .+ grid.gridsize .- oneunit(grid))
+    # cellindices = starts:ends
     
-    return HashGridQuery(grid, cellindices)
+    return HashGridQuery(grid, starts, ends)
 end
 
 function warplinear(grid, ind) 
-    return linearindices(grid)[CartesianIndex(mod1.(Tuple(ind), grid.gridsize))]
+    return grid2hash(grid, mod1.(ind, grid.gridsize))
 end 
 
 function Base.iterate(query::HashGridQuery)
-    cellind = first(query.cellindices)
+    cellind = query.starts
     linearidx = warplinear(query.grid, cellind)
     i       = query.grid.cellstarts[linearidx]
     cellend = query.grid.cellends[linearidx]
@@ -223,21 +228,56 @@ function Base.iterate(query::HashGridQuery)
     return iterate(query, initstate)
 end
 
+@inline function iteratemultiindex(starts, ends, cellind)
+    # IntT = eltype(starts)
+
+    # c_1 = cellind[1]
+    # if c_1 < ends[1]
+    #     cellind = (c_1 + one(IntT), cellind[2], cellind[3])
+    # else 
+    #     c_1 = starts[1]
+    #     c_2 = cellind[2]
+    #     if c_2 < ends[2]
+    #         cellind = (c_1, c_2 + one(IntT), cellind[3])
+    #     else
+    #         c_2 = starts[2]
+    #         c_3 = cellind[3]
+    #         if c_3 < ends[3]
+    #             cellind = (c_1, c_2, c_3 + one(IntT))
+    #         else
+    #             return nothing
+    #         end                        
+    #     end
+    # end
+
+
+    for k in eachindex(starts)
+        c_k = cellind[k] + one(eltype(starts))
+
+        if c_k <= ends[k]
+            return Base.setindex(cellind, c_k, k)
+        else
+            cellind = Base.setindex(cellind, starts[k], k)
+        end
+    end
+    return nothing
+end
+
 function Base.iterate(query::HashGridQuery, state)
     (cellind, i, cellend) = state
+    IntT = inttype(query.grid)
 
-    while true
+    @inbounds while true
         if i <= cellend
             k = query.grid.pointidx[i]
-            return (k, (cellind, i+1, cellend))
+            return (k, (cellind, i + one(IntT), cellend))
         else
-            next = iterate(query.cellindices, cellind)
+            cellind = iteratemultiindex(query.starts, query.ends, cellind)
             
-            if isnothing(next)
+            if isnothing(cellind)
                 return nothing 
             end
 
-            cellind = next[1]
             linearidx = warplinear(query.grid, cellind)
             i       = query.grid.cellstarts[linearidx]
             cellend = query.grid.cellends[linearidx]
