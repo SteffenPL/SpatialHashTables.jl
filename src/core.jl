@@ -59,6 +59,7 @@ function domain(grid::HashGrid)
     return (grid.origin, grid.origin + d)
 end
 
+
 # constructors
 
 function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend = KernelAbstractions.CPU()) where {IndexVecT}
@@ -79,7 +80,7 @@ function HashGrid{IndexVecT}(radius, gridsize, origin, npts, nthreads, backend =
     strides = cumprod(gridsize)
     strides = IntT.((sum(strides[1:end-1]), strides[1:end-1]...))
     
-    return HashGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, strides, backend, Val(nthreads))
+    return HashGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, strides, backend, val(nthreads))
 end
 
 function HashGrid{IndexVecType}(pts, cellwidth, gridsize;
