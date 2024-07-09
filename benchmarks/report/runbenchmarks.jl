@@ -66,7 +66,8 @@ CSV.write(joinpath(basename, "uniform.csv"), df_unif)
                 yticks = 10.0 .^ (-5:2),
                 xlabel = "N",
                 ylabel = "seconds (median)",
-                title = "Uniform random particles with r = 1/N³")
+                title = "Uniform random particles with r = 1/N³",
+                palette = :tab10)
 
 savefig(joinpath(basename, "uniform.png"))
 
@@ -126,6 +127,7 @@ end
 df_xatomic = vcat(dfs_atomic...)
 CSV.write(joinpath(basename, "xatomic.csv"), df_xatomic)
 
+cols = palette(:tab10)
 @df df_xatomic plot(:N, :time_median, 
                 group = (:method),
                 xaxis=:log, 
@@ -135,7 +137,8 @@ CSV.write(joinpath(basename, "xatomic.csv"), df_xatomic)
                 yticks = 10.0 .^ (-5:2),
                 xlabel = "N",
                 ylabel = "seconds (median)",
-                title = "CellListMap.xatomic")
+                title = "CellListMap.xatomic",
+                palette = [cols[1], cols[2], cols[4], cols[5]])
             
                 
 savefig(joinpath(basename, "xatomic.png"))

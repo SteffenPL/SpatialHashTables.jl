@@ -13,8 +13,11 @@ val(x::Val) = x
 
 include("core.jl")
 include("adapt.jl")
+include("operations.jl")
 
-export HashGrid, HashGridQuery
+export HashGrid, BoundedGrid, HashGridQuery, BoundedGridQuery 
 export updatecells!, neighbours
+
+# optional helpers which one might want to import to handle periodic or non-periodic boundaries
 
 end

@@ -1,0 +1,2 @@
+cpu = "12th Gen Intel(R) Core(TM) i7-12700H: \n          speed         user         nice          sys         idle          irq\n#1-20  2700 MHz       6662 s        165 s       1337 s     192267 s          0 s\n"
+gpu = "NVIDIA GeForce RTX 3050 Ti Laptop GPU"
