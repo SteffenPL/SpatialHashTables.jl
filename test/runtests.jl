@@ -53,7 +53,7 @@ end
     # @test naivecell(X, SHT.celldomain(grid, 3)...) == grid[3]
 
 
-    @test naivecell(X, 0.3, 0.7) == sort(collect(neighbours(grid, SVec2(0.5, 0.5), 0.2)))
+    @test naivecell(X, 0.3, 0.7) == sort(collect(neighbours(grid, SVec2(0.5, 0.5), 0.15)))
     @test naivecell(X, 0.4, 0.5) == sort(collect(neighbours(grid, SVec2(0.45, 0.45), 0.02)))
     @test naivecell(X, 0.0, 1.0) == sort(collect(neighbours(grid, SVec2(0.5, 0.5), 1.0)))
 
