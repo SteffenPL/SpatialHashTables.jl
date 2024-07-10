@@ -78,7 +78,7 @@ end
 HashGrid{dim}(cutoff, ncells::Integer, npts::Integer; kwargs...) where {dim} = HashGrid{dim}(cutoff, ncells, npts, Vector{Int64}; kwargs...)
 
 # define npts and dim with an input vector 
-function HashGrid(cutoff, ncells::Integer, pts::AbstractArray, args...; backend = get_backend(pts), kwargs...) where {FT, VT}
+function HashGrid(cutoff, ncells::Integer, pts::AbstractArray, args...; backend = get_backend(pts), kwargs...)
     npts = length(pts)
     dim = length(eltype(pts))
     grid = HashGrid{dim}(cutoff, ncells, npts, args...; backend, kwargs...)
@@ -134,7 +134,8 @@ end
 # basic information
 dimension(::Type{HashGrid{Dim,FT,IT,IVecT,B,V}}) where {Dim,FT,IT,IVecT,B,V} = Dim
 dimension(::Type{BoundedGrid{Dim,FT,IT,IVecT,B,V}}) where {Dim,FT,IT,IVecT,B,V} = Dim
-dimension(grid::AbstractGrid) = dimension(typeof(grid))
+dimension(::HashGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = Dim
+dimension(::BoundedGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = Dim
 
 inttype(::HashGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = IT
 inttype(::BoundedGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = IT
@@ -336,17 +337,17 @@ end
 Base.IteratorSize(::HashGridQuery) = Base.SizeUnknown()
 Base.eltype(query::HashGridQuery) = eltype(query.grid.pointidx) 
 
-function init_hashes(grid::HashGrid{dim}) where {dim}
-    IT = inttype(grid)
-    return zero(SVector{IT(3)^dim, IT}) # Vector{inttype(grid)}(undef, 3^dimension(grid))
-end
+# function init_hashes(grid::HashGrid{dim,FL,IT,IVecT,B,N}) where {dim,FL,IT,IVecT,B,N}
+#     return @SVector zeros(IT, 3^3) # Vector{inttype(grid)}(undef, 3^dimension(grid))
+# end
 
-@generated function HashGridQuery(grid::HashGrid, pos, r, hashes = init_hashes(grid))
+@generated function HashGridQuery(grid::HashGrid, pos, r)
     dim = dimension(grid)
     quote
         IT = inttype(grid)
         FT = floattype(grid)
 
+        hashes = @SVector zeros(IT, 3^$dim)
         @assert r <= maximum(grid.cellwidth)
 
         k = IT(1)
@@ -420,5 +421,5 @@ function Base.iterate(query::HashGridQuery, state)
 end
 
 # uniform interface to access both types of iterators
-neighbours(grid::BoundedGrid, pos, r, hashes = nothing) = BoundedGridQuery(grid, pos, r)
-neighbours(grid::HashGrid, pos, r, args...) = HashGridQuery(grid, pos, r, args...)
+neighbours(grid::BoundedGrid, pos, r) = BoundedGridQuery(grid, pos, r)
+neighbours(grid::HashGrid, pos, r) = HashGridQuery(grid, pos, r)
