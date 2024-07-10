@@ -168,9 +168,9 @@ These are the current performance benchmarks (see `benchmarks/report` folder for
 Notably, the package is approaching the performance of NVIDIA Warp's HashGrid. For benchmarks with only a few particles per box (`uniform`) the performance is already good, for benchmarks with many particles per box (`xatomic`) [CellListMap.jl](https://github.com/m3g/CellListMap.jl) is faster.
 
 <div>
-<img src="./benchmarks/report/output/2024-05-21/xatomic.png" width="45%">
+<img src="./benchmarks/report/output/2024-07-08/xatomic.png" width="45%">
 <!--<img src="./benchmarks/report/output/2024-05-13/xgalactic.png" width="45%">-->
-<img src="./benchmarks/report/output/2024-05-21/uniform.png" width="45%">
+<img src="./benchmarks/report/output/2024-07-09/uniform.png" width="45%">
 </div>
 
 ## Documentation 
