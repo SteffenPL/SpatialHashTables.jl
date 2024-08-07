@@ -3,7 +3,7 @@ using KernelAbstractions: @context
 
 abstract type AbstractGrid end 
 
-struct BoundedGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads} <: AbstractGrid    
+struct BoundedGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads, IndRange} <: AbstractGrid    
     cellwidth::SVector{Dim,FltT}
     cellwidthinv::SVector{Dim,FltT}
 
@@ -21,6 +21,8 @@ struct BoundedGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads} 
 
     backend::BackendT
     nthreads::NThreads
+
+    inds::IndRange
 end
 
 Base.show(io::IO, grid::BoundedGrid) = print(io, "BoundedGrid (gridsize = ", grid.gridsize, ", cellwidth = ", grid.cellwidth, ", backend = ", grid.backend, ", nthreads = ", unval(grid.nthreads), ")")
@@ -28,7 +30,7 @@ Base.show(io::IO, grid::BoundedGrid) = print(io, "BoundedGrid (gridsize = ", gri
 # source: https://matthias-research.github.io/pages/publications/tetraederCollision.pdf
 const default_factors = (92837111, 689287499, 283923481)
 
-struct HashGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads <: Val} <: AbstractGrid    
+struct HashGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads <: Val,IndRange} <: AbstractGrid    
     cellwidth::SVector{Dim,FltT}
     cellwidthinv::SVector{Dim,FltT}
 
@@ -42,6 +44,8 @@ struct HashGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads <: V
 
     backend::BackendT
     nthreads::NThreads
+
+    inds::IndRange
 end
 
 Base.show(io::IO, grid::HashGrid) = print(io, "HashGrid (numcells = ", length(grid.cellstarts), ", cellwidth = ", grid.cellwidth, ", backend = ", grid.backend, ", nthreads = ", unval(grid.nthreads), ")")
@@ -57,7 +61,7 @@ Base.show(io::IO, grid::HashGrid) = print(io, "HashGrid (numcells = ", length(gr
 #
 # If a Vector/CuVector of SVectors is provided, updatecells! will be called automatically.
 
-function HashGrid{dim}(cutoff::FT, ncells::Integer, npts::Integer, ::Type{IndexVecT}; backend = KernelAbstractions.CPU(), nthreads = 16) where {dim, FT, IndexVecT <: AbstractVector}
+function HashGrid{dim}(cutoff::FT, ncells::Integer, npts::Integer, ::Type{IndexVecT}; backend = KernelAbstractions.CPU(), nthreads = 16, inds::SOneTo = SOneTo(dim)) where {dim, FT, IndexVecT <: AbstractVector}
     IT = eltype(IndexVecT)
 
     cellwidth = SVector(ntuple(i -> get(cutoff, i, cutoff[end]), dim))
@@ -71,16 +75,16 @@ function HashGrid{dim}(cutoff::FT, ncells::Integer, npts::Integer, ::Type{IndexV
     
     pseudorandom_factors = IT.(default_factors[1:dim])
 
-    return HashGrid(cellwidth, cellwidthinv, cellidx, pointidx, cellstarts, cellends, pseudorandom_factors, backend, val(nthreads))
+    return HashGrid(cellwidth, cellwidthinv, cellidx, pointidx, cellstarts, cellends, pseudorandom_factors, backend, val(nthreads), inds)
 end
 
 # # default for CPUs 
 HashGrid{dim}(cutoff, ncells::Integer, npts::Integer; kwargs...) where {dim} = HashGrid{dim}(cutoff, ncells, npts, Vector{Int64}; kwargs...)
 
 # define npts and dim with an input vector 
-function HashGrid(cutoff, ncells::Integer, pts::AbstractArray, args...; backend = get_backend(pts), kwargs...)
+function HashGrid(cutoff, ncells::Integer, pts::AbstractArray, args...; backend = get_backend(pts), inds::SOneTo = SOneTo(length(eltype(pts))), kwargs...)
     npts = length(pts)
-    dim = length(eltype(pts))
+    dim = length(inds)
     grid = HashGrid{dim}(cutoff, ncells, npts, args...; backend, kwargs...)
     updatecells!(grid, pts)
     return grid
@@ -88,7 +92,7 @@ end
 
 
 
-function BoundedGrid(cutoff, gridsize::NTuple{dim,T}, npts::Integer, ::Type{IndexVecT}; origin = zero(SVector{dim,eltype(cutoff)}), backend = KernelAbstractions.CPU(), nthreads = 16) where {dim, T <: Integer, IndexVecT <: AbstractVector}
+function BoundedGrid(cutoff, gridsize::NTuple{dim,T}, npts::Integer, ::Type{IndexVecT}; origin = zero(SVector{dim,eltype(cutoff)}), backend = KernelAbstractions.CPU(), nthreads = 16, inds::SOneTo = SOneTo(dim)) where {dim, T <: Integer, IndexVecT <: AbstractVector}
     FT = eltype(cutoff)
     IT = eltype(IndexVecT)
     gridsize = IT.(gridsize)
@@ -106,7 +110,7 @@ function BoundedGrid(cutoff, gridsize::NTuple{dim,T}, npts::Integer, ::Type{Inde
     strides = cumprod(gridsize)
     strides = IT.((sum(strides[1:end-1]), strides[1:end-1]...))
 
-    return BoundedGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, strides, backend, val(nthreads))
+    return BoundedGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, strides, backend, val(nthreads), inds)
 end
 
 # default for CPU 
@@ -132,18 +136,18 @@ end
 
 
 # basic information
-dimension(::Type{HashGrid{Dim,FT,IT,IVecT,B,V}}) where {Dim,FT,IT,IVecT,B,V} = Dim
-dimension(::Type{BoundedGrid{Dim,FT,IT,IVecT,B,V}}) where {Dim,FT,IT,IVecT,B,V} = Dim
-dimension(::HashGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = Dim
-dimension(::BoundedGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = Dim
+dimension(::Type{HashGrid{Dim,FT,IT,IVecT,B,V,IndsT}}) where {Dim,FT,IT,IVecT,B,V,IndsT} = Dim
+dimension(::Type{BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT}}) where {Dim,FT,IT,IVecT,B,V,IndsT} = Dim
+dimension(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = Dim
+dimension(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = Dim
 
-inttype(::HashGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = IT
-inttype(::BoundedGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = IT
+inttype(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = IT
+inttype(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = IT
 
 # linearindices(grid::HashGrid) = grid.lininds
 # cartesianindices(grid::HashGrid) = CartesianIndices(grid.gridsize)
-floattype(::BoundedGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = FT
-floattype(::HashGrid{Dim,FT,IT,IVecT,B,V}) where {Dim,FT,IT,IVecT,B,V} = FT
+floattype(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = FT
+floattype(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = FT
 
 numthreads(grid::AbstractGrid) = unval(grid.nthreads)
 
@@ -175,15 +179,19 @@ domain(grid::HashGrid) = (-domainsize(grid), domainsize(grid))
 # - grid (gridindex, cartesian, maybe out of range!) 
 # - hash (cellindex, linear)
 
+@inline position(grid::AbstractGrid, pos) = pos[grid.inds]
+
 @inline function pos2grid(grid::BoundedGrid, pos)
     IT = inttype(grid)
-    ind = @. ceil(IT, (pos - grid.origin) * grid.cellwidthinv)
+    pos_ = position(grid, pos)
+    ind = @. ceil(IT, (pos_ - grid.origin) * grid.cellwidthinv)
     return Tuple(ind)
 end
 
 @inline function pos2grid(grid::HashGrid, pos)
     IT = inttype(grid)
-    ind = @. ceil(IT, pos * grid.cellwidthinv)
+    pos_ = position(grid, pos)
+    ind = @. ceil(IT, pos_ * grid.cellwidthinv)
     return Tuple(ind)
 end
 

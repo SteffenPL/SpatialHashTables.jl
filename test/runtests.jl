@@ -86,3 +86,25 @@ end
     @test N in collect(neighbours(grid, SVec2(0.01, 0.5), 0.1))
     @test !(N in collect(neighbours(grid, SVec2(0.01, 0.3), 0.1)))
 end 
+
+
+@testset "Subset positions" begin 
+    X = [SA[0.1, 0.1, 0.5], SA[0.1, 0.1, 0.0]]
+    grid = BoundedGrid(0.1, (10, 10), X)
+    @test grid[1,1] == [1,2]
+
+
+    X = [SA[0.1, 0.5, 0.1], SA[0.1, 0.0, 0.1]]
+    grid = BoundedGrid(0.1, (10, 10), X)
+    @test grid[1,5] == [1]
+
+
+    X = [SA[0.1, 0.1, 0.5], SA[0.1, 0.1, 0.0]]
+    grid = HashGrid(0.1, 100, X; inds = SOneTo(2))
+    @test grid[1,1] == [1,2]
+
+
+    X = [SA[0.1, 0.5, 0.1], SA[0.1, 0.0, 0.1]]
+    grid = HashGrid(0.1, 100, X)
+    @test grid[1,5,1] == [1]
+end
