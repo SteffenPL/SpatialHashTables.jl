@@ -77,8 +77,7 @@ end
     
     Xi = X[i]
     Fi = zero(eltype(F))
-    hashes = SpatialHashTables.init_hashes(grid)
-    for j in neighbours(grid, Xi, r, hashes)
+    for j in neighbours(grid, Xi, r)
         Xij = Xi - X[j]
         d = sqrt(dist_sq(Xij))
         if zero(d) < d < r
@@ -136,14 +135,14 @@ function append_data(df, name, N, bench, show_results)
 end
 
 function forcebenchmark(N, ptsgen, 
-                            name)                            
-    naive = true
-    serial = true
-    gpu = true
-    hash_gpu = false
-    hash_cpu = true
-    celllistmap = true 
-    show_results = true                                
+                            name;                            
+                        naive = true,
+                        serial = false,
+                        gpu = true,
+                        hash_gpu = false,
+                        hash_cpu = true,
+                        celllistmap = true, 
+                        show_results = true)                                
 
     df = DataFrame()
 

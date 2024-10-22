@@ -67,7 +67,6 @@ end
 
 
 
-
 function inner_kdtree(F, X, kdtree, i, r, r²)
     Xi = X[i]
     Fi = zero(Xi) 

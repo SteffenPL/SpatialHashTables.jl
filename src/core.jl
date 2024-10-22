@@ -13,6 +13,7 @@ struct BoundedGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads, 
 
     cellidx::IntVecT 
     pointidx::IntVecT
+    cache::IntVecT
 
     cellstarts::IntVecT
     cellends::IntVecT 
@@ -36,6 +37,7 @@ struct HashGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads <: V
 
     cellidx::IntVecT 
     pointidx::IntVecT
+    cache::IntVecT
 
     cellstarts::IntVecT
     cellends::IntVecT 
@@ -69,13 +71,14 @@ function HashGrid{dim}(cutoff::FT, ncells::Integer, npts::Integer, ::Type{IndexV
 
     cellidx  = IndexVecT(undef, npts)
     pointidx = IndexVecT(undef, npts)
+    cache = similar(cellidx)
 
     cellstarts = IndexVecT(undef, ncells)
     cellends   = IndexVecT(undef, ncells)
     
     pseudorandom_factors = IT.(default_factors[1:dim])
 
-    return HashGrid(cellwidth, cellwidthinv, cellidx, pointidx, cellstarts, cellends, pseudorandom_factors, backend, val(nthreads), inds)
+    return HashGrid(cellwidth, cellwidthinv, cellidx, pointidx, cache, cellstarts, cellends, pseudorandom_factors, backend, val(nthreads), inds)
 end
 
 # # default for CPUs 
@@ -102,6 +105,7 @@ function BoundedGrid(cutoff, gridsize::NTuple{dim,T}, npts::Integer, ::Type{Inde
 
     cellidx  = IndexVecT(undef, npts)
     pointidx = IndexVecT(undef, npts)
+    cache = similar(cellidx)
 
     ncells = prod(gridsize)
     cellstarts = IndexVecT(undef, ncells)
@@ -110,7 +114,7 @@ function BoundedGrid(cutoff, gridsize::NTuple{dim,T}, npts::Integer, ::Type{Inde
     strides = cumprod(gridsize)
     strides = IT.((sum(strides[1:end-1]), strides[1:end-1]...))
 
-    return BoundedGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cellstarts, cellends, strides, backend, val(nthreads), inds)
+    return BoundedGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cache, cellstarts, cellends, strides, backend, val(nthreads), inds)
 end
 
 # default for CPU 
@@ -242,7 +246,12 @@ function compute_cell_offsets!(grid::AbstractGrid, nthreads = grid.nthreads)
     compute_cell_offsets_kernel!(grid.backend, unval(nthreads))(grid, ndrange = length(grid.cellidx))
 end
 
-function paired_sort!(ix, a)
+function paired_sort!(ix::AK.AbstractGPUVector, a, cache)
+    AK.sortperm!(ix, a, temp = cache)
+    permute!(a, ix)
+end
+
+function paired_sort!(ix, a, cache)
     sortperm!(ix, a)
     permute!(a, ix)
 end
@@ -252,12 +261,13 @@ function updatecells!(grid, pts; nthreads = grid.nthreads)
 
     resize!(grid.cellidx, length(pts))
     resize!(grid.pointidx, length(pts))
+    resize!(grid.cache, length(pts))
 
     fill!(grid.cellstarts, IT(1))
     fill!(grid.cellends,   IT(0))
 
     compute_cell_hashes!(grid, pts, nthreads)
-    paired_sort!(grid.pointidx, grid.cellidx)
+    paired_sort!(grid.pointidx, grid.cellidx, grid.cache)
     compute_cell_offsets!(grid, nthreads)
 
     # after this operation, pointidx[i] is a point index and cellidx[i] is the cell index containing the point 
@@ -265,7 +275,6 @@ function updatecells!(grid, pts; nthreads = grid.nthreads)
 
     KernelAbstractions.synchronize(grid.backend)
 end
-
 
 
 # iteration over neighbours 

@@ -1,21 +1,22 @@
 name = "SpatialHashTables"
 uuid = "894afd4e-5c6f-4d1a-a294-873acbd0e95c"
 authors = ["Steffen Plunder <steffen.plunder@web.de> and contributors"]
-version = "0.3.0"
+version = "0.3.1"
 
 [deps]
+AcceleratedKernels = "6a4ca0a5-0e36-4168-a932-d9be78d558f1"
 Adapt = "79e6a3ab-5dfb-504d-930d-738a2a938a0e"
 Compat = "34da2185-b29b-5c13-b0c7-acf172513d20"
 KernelAbstractions = "63c18a36-062a-441e-b654-da1e3ab1ce7c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 
 [compat]
+AcceleratedKernels = "0.1.0"
 Adapt = "3, 4"
-StaticArrays = "1"
 Compat = "3, 4"
-julia = "1.6"
 KernelAbstractions = "0.9"
-
+StaticArrays = "1"
+julia = "1.6"
 
 [extras]
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"

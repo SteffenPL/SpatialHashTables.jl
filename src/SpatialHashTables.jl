@@ -2,6 +2,7 @@ module SpatialHashTables
 
 using StaticArrays
 using KernelAbstractions
+import AcceleratedKernels as AK 
 import Adapt: adapt_structure
 using Compat
 

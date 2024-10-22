@@ -10,7 +10,6 @@ mkpath(basename)
 collectsysteminfo(joinpath(basename, "sysinfo"))
 
 
-
 # BenchmarkTools.DEFAULT_PARAMETERS.samples = 10
 
 # Case 1: Uniform points with fixed number of particles per ideal inner loop
