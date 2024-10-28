@@ -12,7 +12,8 @@ function adapt_structure(to, grid::BoundedGrid)
         grid.strides,
         grid.backend,
         grid.nthreads,
-        grid.inds)
+        grid.inds,
+        adapt_structure(to, grid.onceupdated))
 end
 
 function adapt_structure(to, grid::HashGrid) 
@@ -27,5 +28,6 @@ function adapt_structure(to, grid::HashGrid)
         grid.pseudorandom_factors,
         grid.backend,
         grid.nthreads,
-        grid.inds)
+        grid.inds,
+        adapt_structure(to, grid.onceupdated))
 end

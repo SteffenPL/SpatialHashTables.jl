@@ -24,6 +24,7 @@ struct BoundedGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads, 
     nthreads::NThreads
 
     inds::IndRange
+    onceupdated::Base.Ref{Bool}
 end
 
 Base.show(io::IO, grid::BoundedGrid) = print(io, "BoundedGrid (gridsize = ", grid.gridsize, ", cellwidth = ", grid.cellwidth, ", backend = ", grid.backend, ", nthreads = ", unval(grid.nthreads), ")")
@@ -48,6 +49,7 @@ struct HashGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads <: V
     nthreads::NThreads
 
     inds::IndRange
+    onceupdated::Base.Ref{Bool}
 end
 
 Base.show(io::IO, grid::HashGrid) = print(io, "HashGrid (numcells = ", length(grid.cellstarts), ", cellwidth = ", grid.cellwidth, ", backend = ", grid.backend, ", nthreads = ", unval(grid.nthreads), ")")
@@ -78,7 +80,7 @@ function HashGrid{dim}(cutoff::FT, ncells::Integer, npts::Integer, ::Type{IndexV
     
     pseudorandom_factors = IT.(default_factors[1:dim])
 
-    return HashGrid(cellwidth, cellwidthinv, cellidx, pointidx, cache, cellstarts, cellends, pseudorandom_factors, backend, val(nthreads), inds)
+    return HashGrid(cellwidth, cellwidthinv, cellidx, pointidx, cache, cellstarts, cellends, pseudorandom_factors, backend, val(nthreads), inds, Ref(false))
 end
 
 # # default for CPUs 
@@ -114,7 +116,7 @@ function BoundedGrid(cutoff, gridsize::NTuple{dim,T}, npts::Integer, ::Type{Inde
     strides = cumprod(gridsize)
     strides = IT.((sum(strides[1:end-1]), strides[1:end-1]...))
 
-    return BoundedGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cache, cellstarts, cellends, strides, backend, val(nthreads), inds)
+    return BoundedGrid(cellwidth, cellwidthinv, gridsize, origin, cellidx, pointidx, cache, cellstarts, cellends, strides, backend, val(nthreads), inds, Ref(false))
 end
 
 # default for CPU 
@@ -183,7 +185,7 @@ domain(grid::HashGrid) = (-domainsize(grid), domainsize(grid))
 # - grid (gridindex, cartesian, maybe out of range!) 
 # - hash (cellindex, linear)
 
-@inline position(grid::AbstractGrid, pos) = pos[grid.inds]
+@inline position(grid::AbstractGrid, pos) = pos #[grid.inds]
 
 @inline function pos2grid(grid::BoundedGrid, pos)
     IT = inttype(grid)
@@ -273,6 +275,8 @@ function updatecells!(grid, pts; nthreads = grid.nthreads)
     # after this operation, pointidx[i] is a point index and cellidx[i] is the cell index containing the point 
     # cellstarts and cellends defines the range of a cell inside 'pointidx' 
 
+    grid.onceupdated[] = true
+
     KernelAbstractions.synchronize(grid.backend)
 end
 
@@ -302,8 +306,12 @@ end
 Base.IteratorSize(::BoundedGridQuery) = Base.SizeUnknown()
 Base.eltype(query::BoundedGridQuery) = eltype(query.grid.pointidx) 
 
-
 function BoundedGridQuery(grid::AbstractGrid, pos, r)
+
+    if grid.onceupdated[] == false
+        error("Grid has not been updated yet. Call initially `updatecells!`.")
+    end
+
     IT = inttype(grid)
     starts =      pos2grid(grid, pos .- r)
     ends   = min.(pos2grid(grid, pos .+ r), starts .+ grid.gridsize .- IT(1))
