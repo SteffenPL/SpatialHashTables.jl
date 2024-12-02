@@ -3,7 +3,7 @@ using KernelAbstractions: @context
 
 abstract type AbstractGrid end 
 
-struct BoundedGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads, IndRange} <: AbstractGrid    
+struct BoundedGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads, IndRange, BoolRefT} <: AbstractGrid    
     cellwidth::SVector{Dim,FltT}
     cellwidthinv::SVector{Dim,FltT}
 
@@ -24,7 +24,7 @@ struct BoundedGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads, 
     nthreads::NThreads
 
     inds::IndRange
-    onceupdated::Base.Ref{Bool}
+    onceupdated::BoolRefT
 end
 
 Base.show(io::IO, grid::BoundedGrid) = print(io, "BoundedGrid (gridsize = ", grid.gridsize, ", cellwidth = ", grid.cellwidth, ", backend = ", grid.backend, ", nthreads = ", unval(grid.nthreads), ")")
@@ -32,7 +32,7 @@ Base.show(io::IO, grid::BoundedGrid) = print(io, "BoundedGrid (gridsize = ", gri
 # source: https://matthias-research.github.io/pages/publications/tetraederCollision.pdf
 const default_factors = (92837111, 689287499, 283923481)
 
-struct HashGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads <: Val,IndRange} <: AbstractGrid    
+struct HashGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads <: Val,IndRange, BoolRefT} <: AbstractGrid    
     cellwidth::SVector{Dim,FltT}
     cellwidthinv::SVector{Dim,FltT}
 
@@ -49,7 +49,7 @@ struct HashGrid{Dim, FltT<:Real, IntT<:Integer, IntVecT, BackendT, NThreads <: V
     nthreads::NThreads
 
     inds::IndRange
-    onceupdated::Base.Ref{Bool}
+    onceupdated::BoolRefT
 end
 
 Base.show(io::IO, grid::HashGrid) = print(io, "HashGrid (numcells = ", length(grid.cellstarts), ", cellwidth = ", grid.cellwidth, ", backend = ", grid.backend, ", nthreads = ", unval(grid.nthreads), ")")
@@ -142,18 +142,18 @@ end
 
 
 # basic information
-dimension(::Type{HashGrid{Dim,FT,IT,IVecT,B,V,IndsT}}) where {Dim,FT,IT,IVecT,B,V,IndsT} = Dim
-dimension(::Type{BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT}}) where {Dim,FT,IT,IVecT,B,V,IndsT} = Dim
-dimension(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = Dim
-dimension(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = Dim
+dimension(::Type{HashGrid{Dim,FT,IT,IVecT,B,V,IndsT,BT}}) where {Dim,FT,IT,IVecT,B,V,IndsT,BT} = Dim
+dimension(::Type{BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT,BT}}) where {Dim,FT,IT,IVecT,B,V,IndsT,BT} = Dim
+dimension(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT,BT}) where {Dim,FT,IT,IVecT,B,V,IndsT,BT} = Dim
+dimension(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT,BT}) where {Dim,FT,IT,IVecT,B,V,IndsT,BT} = Dim
 
-inttype(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = IT
-inttype(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = IT
+inttype(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT,BT}) where {Dim,FT,IT,IVecT,B,V,IndsT,BT} = IT
+inttype(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT,BT}) where {Dim,FT,IT,IVecT,B,V,IndsT,BT} = IT
 
 # linearindices(grid::HashGrid) = grid.lininds
 # cartesianindices(grid::HashGrid) = CartesianIndices(grid.gridsize)
-floattype(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = FT
-floattype(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT}) where {Dim,FT,IT,IVecT,B,V,IndsT} = FT
+floattype(::BoundedGrid{Dim,FT,IT,IVecT,B,V,IndsT,BT}) where {Dim,FT,IT,IVecT,B,V,IndsT,BT} = FT
+floattype(::HashGrid{Dim,FT,IT,IVecT,B,V,IndsT,BT}) where {Dim,FT,IT,IVecT,B,V,IndsT,BT} = FT
 
 numthreads(grid::AbstractGrid) = unval(grid.nthreads)
 
